@@ -180,6 +180,8 @@ async def main() -> None:
             from monitor.signal_generator import SignalGenerator
             from trader.trade_executor import TradeExecutor
             from trader.position_manager import PositionManager
+            from telegram_bot.bot import TelegramBot
+            from telegram_bot.notifier import TelegramNotifier
 
             # Initialize trade executor
             executor = TradeExecutor(settings, db, solana)
@@ -193,6 +195,16 @@ async def main() -> None:
             pos_manager = PositionManager(settings, db, executor)
             await pos_manager.initialize()
 
+            # Initialize Telegram bot (command handler) and notifier (push alerts)
+            tg_bot = TelegramBot(settings, db)
+            await tg_bot.initialize()
+
+            notifier = TelegramNotifier(settings)
+            await notifier.initialize()
+
+            # Give the executor access to the notifier for sell alerts
+            executor.notifier = notifier
+
             # Signal handler: when a wallet buys, validate and maybe copy
             async def on_wallet_signal(signal: dict) -> None:
                 should_trade, enriched, skip_reason = await sig_gen.validate_signal(signal)
@@ -200,12 +212,25 @@ async def main() -> None:
                     result = await executor.handle_signal(enriched)
                     if result:
                         logger.info("copy_trade_result", status=result.get("status"))
+                        # Push Telegram alert for executed trade
+                        await notifier.notify_buy({
+                            "token_symbol": enriched.get("token_symbol"),
+                            "amount_sol": result.get("amount_sol"),
+                            "price_usd": result.get("price_usd"),
+                            "triggered_by_wallet": enriched.get("wallet_address", ""),
+                            "status": result.get("status"),
+                            "tx_signature": result.get("tx_signature", ""),
+                        })
                 else:
                     logger.info("signal_skipped", reason=skip_reason)
+                    await notifier.notify_signal_skipped(signal, skip_reason)
 
             # Initialize wallet monitor with our signal handler
             monitor = WalletMonitor(settings, db, solana, on_signal=on_wallet_signal)
             await monitor.initialize()
+
+            # Send startup notification
+            await notifier.notify_startup()
 
             logger.info(
                 "bot_ready",
@@ -214,16 +239,18 @@ async def main() -> None:
                 note="All systems running. Monitoring wallets.",
             )
 
-            # Run monitor and position manager concurrently (both are infinite loops)
+            # Run monitor, position manager, and Telegram bot concurrently
             try:
                 await asyncio.gather(
                     monitor.start(),
                     pos_manager.start(),
+                    tg_bot.start(),
                 )
             except asyncio.CancelledError:
                 pass
 
             # Cleanup
+            await tg_bot.stop()
             await sig_gen.close()
             await executor.close()
             await pos_manager.close()
