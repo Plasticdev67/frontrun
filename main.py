@@ -114,11 +114,21 @@ async def main() -> None:
     try:
         if args.discover:
             # Stage 1: Run token discovery only
+            # Finds the best-performing Solana tokens from the last 30 days
             logger.info("mode_discovery_only")
-            # TODO: Stage 1 — from discovery.token_scanner import TokenScanner
-            # scanner = TokenScanner(settings, db, solana)
-            # await scanner.run()
-            logger.info("token_discovery_not_yet_implemented", note="Coming in Stage 1")
+            from discovery.token_scanner import TokenScanner
+            from discovery.token_filter import TokenFilter
+
+            scanner = TokenScanner(settings, db)
+            await scanner.initialize()
+            tokens = await scanner.run_discovery()
+
+            # Apply quality filters
+            token_filter = TokenFilter(settings)
+            quality_tokens = token_filter.apply_filters(tokens)
+            logger.info("discovery_finished", total_found=len(tokens), after_quality_filter=len(quality_tokens))
+
+            await scanner.close()
 
         elif args.analyze:
             # Stage 2: Run wallet analysis only
