@@ -61,6 +61,7 @@ class TradeExecutor:
         self.jupiter: JupiterClient | None = None
         self.safety: SafetyRails = SafetyRails(settings, db)
         self.session: aiohttp.ClientSession | None = None
+        self.notifier: Any | None = None  # Optional TelegramNotifier, set from main.py
 
     async def initialize(self) -> None:
         """Set up the Jupiter client and HTTP session."""
@@ -352,7 +353,7 @@ class TradeExecutor:
             "side": "sell",
             "amount_sol": sol_received,
             "amount_tokens": tokens_to_sell,
-            "price_usd": signal.get("token_data", {}).get("price_usd", 0) if isinstance(signal, dict) else 0,
+            "price_usd": position.get("current_price_usd", position.get("entry_price_usd", 0)),
             "sell_reason": reason,
             "tx_signature": tx_signature,
             "status": status,
@@ -381,6 +382,16 @@ class TradeExecutor:
             )
 
         await self.safety.post_trade_check()
+
+        # Push Telegram notification for the sell
+        if self.notifier:
+            await self.notifier.notify_sell({
+                "token_symbol": token_symbol,
+                "sol_received": sol_received,
+                "reason": reason,
+                "status": status,
+                "tx_signature": tx_signature,
+            })
 
         return {
             "trade_id": trade_id,
