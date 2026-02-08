@@ -173,21 +173,60 @@ async def main() -> None:
             logger.info("analysis_complete", monitored_wallets=len(monitored))
 
         else:
-            # Full bot mode — start all active modules
+            # Full bot mode — start all modules concurrently
             logger.info("mode_full_bot")
+
+            from monitor.wallet_monitor import WalletMonitor
+            from monitor.signal_generator import SignalGenerator
+            from trader.trade_executor import TradeExecutor
+            from trader.position_manager import PositionManager
+
+            # Initialize trade executor
+            executor = TradeExecutor(settings, db, solana)
+            await executor.initialize()
+
+            # Initialize signal generator (validates signals before trading)
+            sig_gen = SignalGenerator(settings, db)
+            await sig_gen.initialize()
+
+            # Initialize position manager (monitors TP/SL)
+            pos_manager = PositionManager(settings, db, executor)
+            await pos_manager.initialize()
+
+            # Signal handler: when a wallet buys, validate and maybe copy
+            async def on_wallet_signal(signal: dict) -> None:
+                should_trade, enriched, skip_reason = await sig_gen.validate_signal(signal)
+                if should_trade:
+                    result = await executor.handle_signal(enriched)
+                    if result:
+                        logger.info("copy_trade_result", status=result.get("status"))
+                else:
+                    logger.info("signal_skipped", reason=skip_reason)
+
+            # Initialize wallet monitor with our signal handler
+            monitor = WalletMonitor(settings, db, solana, on_signal=on_wallet_signal)
+            await monitor.initialize()
+
             logger.info(
                 "bot_ready",
                 trading_mode=settings.trading_mode,
-                note="All systems initialized. Modules will be added as we build each stage.",
+                position_size=f"{settings.default_position_size_sol} SOL",
+                note="All systems running. Monitoring wallets.",
             )
 
-            # Keep the bot running (modules will add their own loops)
-            # For now, just demonstrate that everything starts up correctly
-            logger.info("waiting_for_modules", note="Bot is running. Press Ctrl+C to stop.")
+            # Run monitor and position manager concurrently (both are infinite loops)
             try:
-                await asyncio.Event().wait()  # Run forever until interrupted
+                await asyncio.gather(
+                    monitor.start(),
+                    pos_manager.start(),
+                )
             except asyncio.CancelledError:
                 pass
+
+            # Cleanup
+            await sig_gen.close()
+            await executor.close()
+            await pos_manager.close()
 
     except KeyboardInterrupt:
         logger.info("bot_stopping", reason="keyboard_interrupt")
