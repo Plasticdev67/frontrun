@@ -144,13 +144,34 @@ class Settings:
         default_factory=lambda: _get_env_float("MIN_LIQUIDITY_USD", 10000)
     )
 
-    # Market cap range (in USD) for tokens we'll trade
-    min_market_cap_usd: float = field(
-        default_factory=lambda: _get_env_float("MIN_MARKET_CAP_USD", 1_000_000)
+    # --- Market Cap Ranges ---
+    # DISCOVERY: Used to find past winners (Stage 1). Higher floor because
+    # we're looking for tokens that already proved themselves.
+    discovery_min_mcap_usd: float = field(
+        default_factory=lambda: _get_env_float("DISCOVERY_MIN_MCAP_USD", 1_000_000)
     )
-    max_market_cap_usd: float = field(
-        default_factory=lambda: _get_env_float("MAX_MARKET_CAP_USD", 50_000_000)
+    discovery_max_mcap_usd: float = field(
+        default_factory=lambda: _get_env_float("DISCOVERY_MAX_MCAP_USD", 50_000_000)
     )
+
+    # COPY TRADING: Used when deciding whether to follow a smart wallet's buy.
+    # Much lower floor — if a proven wallet is buying at $100K mcap, that's
+    # exactly the alpha we want. We just need minimum liquidity to protect us.
+    min_copy_trade_mcap_usd: float = field(
+        default_factory=lambda: _get_env_float("MIN_COPY_TRADE_MCAP_USD", 50_000)
+    )
+    max_copy_trade_mcap_usd: float = field(
+        default_factory=lambda: _get_env_float("MAX_COPY_TRADE_MCAP_USD", 100_000_000)
+    )
+
+    # Legacy aliases (used by older code — map to discovery range)
+    @property
+    def min_market_cap_usd(self) -> float:
+        return self.discovery_min_mcap_usd
+
+    @property
+    def max_market_cap_usd(self) -> float:
+        return self.discovery_max_mcap_usd
 
     # Tokens we will NEVER buy, no matter what
     # Add token mint addresses here to blacklist them

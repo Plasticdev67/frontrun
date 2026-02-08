@@ -131,12 +131,46 @@ async def main() -> None:
             await scanner.close()
 
         elif args.analyze:
-            # Stage 2: Run wallet analysis only
-            logger.info("mode_analysis_only")
-            # TODO: Stage 2 — from analyzer.wallet_finder import WalletAnalyzer
-            # analyzer = WalletAnalyzer(settings, db, solana)
-            # await analyzer.run()
-            logger.info("wallet_analysis_not_yet_implemented", note="Coming in Stage 2")
+            # Stage 2: Run wallet analysis on previously discovered tokens
+            # First discover tokens (or use cached), then find + score wallets
+            logger.info("mode_analysis")
+
+            from discovery.token_scanner import TokenScanner
+            from discovery.token_filter import TokenFilter
+            from analyzer.wallet_finder import WalletFinder
+            from analyzer.wallet_scorer import WalletScorer
+            from analyzer.anomaly_detector import AnomalyDetector
+
+            # Step 1: Get tokens to analyze (from DB or fresh discovery)
+            top_tokens = await db.get_top_tokens(limit=settings.max_discovery_tokens)
+            if not top_tokens:
+                logger.info("no_cached_tokens", note="Running discovery first...")
+                scanner = TokenScanner(settings, db)
+                await scanner.initialize()
+                top_tokens = await scanner.run_discovery()
+                token_filter = TokenFilter(settings)
+                top_tokens = token_filter.apply_filters(top_tokens)
+                await scanner.close()
+
+            # Step 2: Find wallets that were early on these tokens
+            finder = WalletFinder(settings, db, solana)
+            await finder.initialize()
+            wallet_data = await finder.find_smart_wallets(top_tokens)
+            await finder.close()
+
+            # Step 3: Score the wallets
+            scorer = WalletScorer(settings, db)
+            scored_wallets = await scorer.score_wallets(wallet_data)
+
+            # Step 4: Flag suspicious wallets (bots, insiders, devs)
+            detector = AnomalyDetector(settings)
+            scored_wallets = detector.analyze(scored_wallets, wallet_data)
+
+            # Step 5: Auto-select the best clean wallets for monitoring
+            monitored = await scorer.auto_select_monitored_wallets(
+                [w for w in scored_wallets if not w.get("is_flagged")]
+            )
+            logger.info("analysis_complete", monitored_wallets=len(monitored))
 
         else:
             # Full bot mode — start all active modules
