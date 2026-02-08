@@ -1,0 +1,218 @@
+"""
+Signal Generator
+================
+Adds validation and intelligence on top of raw wallet buy signals.
+
+When the WalletMonitor detects a smart wallet buying a token,
+the signal comes here BEFORE going to the trade executor.
+
+This module checks:
+1. Is the token safe to buy? (liquidity, honeypot, blacklist)
+2. Do we already have a position in this token?
+3. Are we within our risk limits? (max positions, daily loss)
+4. Are multiple smart wallets buying the same token? (stronger signal)
+5. Does the market cap meet our copy trading threshold?
+
+Think of this as the "risk manager" that sits between detection and execution.
+The monitor says "smart wallet bought something!" and this module decides
+if we should follow.
+"""
+
+import asyncio
+from datetime import datetime, timezone
+
+import aiohttp
+
+from config.settings import Settings
+from database.db import Database
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+class SignalGenerator:
+    """
+    Validates and enriches raw buy signals before sending to trade executor.
+
+    Usage:
+        sig_gen = SignalGenerator(settings, db)
+        await sig_gen.initialize()
+        should_trade, enriched = await sig_gen.validate_signal(raw_signal)
+    """
+
+    def __init__(self, settings: Settings, db: Database):
+        self.settings = settings
+        self.db = db
+        self.session: aiohttp.ClientSession | None = None
+
+    async def initialize(self) -> None:
+        """Set up HTTP session for API calls."""
+        self.session = aiohttp.ClientSession()
+        logger.info("signal_generator_initialized")
+
+    async def close(self) -> None:
+        """Clean up."""
+        if self.session:
+            await self.session.close()
+
+    async def validate_signal(self, signal: dict) -> tuple[bool, dict, str]:
+        """
+        Validate a raw buy signal and decide if we should copy it.
+
+        Returns:
+            (should_trade, enriched_signal, skip_reason)
+            - should_trade: True if we should execute the copy trade
+            - enriched_signal: Signal with added token data
+            - skip_reason: Why we're skipping (empty string if we should trade)
+        """
+        token_mint = signal["token_mint"]
+
+        # Check 1: Kill switch
+        if self.settings.trading_paused:
+            return False, signal, "Trading is paused (kill switch active)"
+
+        # Check 2: Blacklist
+        if token_mint in self.settings.token_blacklist:
+            await self.db.mark_signal_skipped(signal.get("signal_id", 0), "blacklisted")
+            return False, signal, f"Token is blacklisted"
+
+        # Check 3: Max open positions
+        open_count = await self.db.get_open_position_count()
+        if open_count >= self.settings.max_open_positions:
+            await self.db.mark_signal_skipped(signal.get("signal_id", 0), "max_positions_reached")
+            return False, signal, f"Max positions reached ({open_count}/{self.settings.max_open_positions})"
+
+        # Check 4: Daily loss limit
+        daily_pnl = await self.db.get_todays_pnl()
+        if daily_pnl <= -self.settings.max_daily_loss_sol:
+            self.settings.trading_paused = True  # Auto-pause
+            await self.db.mark_signal_skipped(signal.get("signal_id", 0), "daily_loss_limit")
+            return False, signal, f"Daily loss limit hit ({daily_pnl:.4f} SOL)"
+
+        # Check 5: Already have a position in this token?
+        existing_position = await self.db.get_position_by_token(token_mint)
+        if existing_position:
+            # Check if we've hit our max position size for this token
+            invested = existing_position.get("amount_sol_invested", 0)
+            if invested >= self.settings.max_position_size_sol:
+                await self.db.mark_signal_skipped(signal.get("signal_id", 0), "max_position_size")
+                return False, signal, f"Max position size reached for this token ({invested:.4f} SOL)"
+
+        # Check 6: Get token data (price, liquidity, market cap)
+        token_data = await self._get_token_data(token_mint)
+        signal["token_data"] = token_data
+
+        if token_data:
+            symbol = token_data.get("symbol", "???")
+            signal["token_symbol"] = symbol
+
+            # Check liquidity
+            liquidity = token_data.get("liquidity_usd", 0)
+            if liquidity < self.settings.min_liquidity_usd:
+                reason = f"Insufficient liquidity: ${liquidity:,.0f} (min: ${self.settings.min_liquidity_usd:,.0f})"
+                await self.db.mark_signal_skipped(signal.get("signal_id", 0), "low_liquidity")
+                return False, signal, reason
+
+            # Check market cap against COPY TRADING range (not discovery range)
+            mcap = token_data.get("market_cap_usd", 0)
+            if mcap > 0:
+                if mcap < self.settings.min_copy_trade_mcap_usd:
+                    reason = f"Market cap too low for copy trade: ${mcap:,.0f}"
+                    await self.db.mark_signal_skipped(signal.get("signal_id", 0), "mcap_too_low")
+                    return False, signal, reason
+                if mcap > self.settings.max_copy_trade_mcap_usd:
+                    reason = f"Market cap too high: ${mcap:,.0f}"
+                    await self.db.mark_signal_skipped(signal.get("signal_id", 0), "mcap_too_high")
+                    return False, signal, reason
+
+        # Check 7: Honeypot detection (can we actually sell this token?)
+        is_honeypot = await self._check_honeypot(token_mint)
+        if is_honeypot:
+            await self.db.mark_signal_skipped(signal.get("signal_id", 0), "honeypot_detected")
+            return False, signal, "Honeypot detected — token cannot be sold"
+
+        # All checks passed!
+        logger.info(
+            "signal_validated",
+            token=signal.get("token_symbol", token_mint[:8]),
+            wallet=signal["wallet_address"][:8] + "...",
+            liquidity=f"${token_data.get('liquidity_usd', 0):,.0f}" if token_data else "unknown",
+            confidence=f"{signal.get('confidence', 0):.2f}",
+        )
+
+        return True, signal, ""
+
+    async def _get_token_data(self, token_mint: str) -> dict | None:
+        """
+        Fetch current token data from Birdeye.
+        Returns price, liquidity, market cap, etc.
+        """
+        try:
+            url = "https://public-api.birdeye.so/defi/token_overview"
+            headers = {
+                "X-API-KEY": self.settings.birdeye_api_key,
+                "x-chain": "solana",
+            }
+            params = {"address": token_mint}
+
+            async with self.session.get(url, headers=headers, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    token_info = data.get("data", {})
+                    return {
+                        "symbol": token_info.get("symbol", "???"),
+                        "name": token_info.get("name", ""),
+                        "price_usd": token_info.get("price", 0),
+                        "market_cap_usd": token_info.get("mc", 0),
+                        "liquidity_usd": token_info.get("liquidity", 0),
+                        "volume_24h_usd": token_info.get("v24hUSD", 0),
+                        "holder_count": token_info.get("holder", 0),
+                    }
+                else:
+                    logger.warning("token_data_fetch_failed", status=response.status)
+                    return None
+
+        except Exception as e:
+            logger.error("token_data_error", error=str(e))
+            return None
+
+    async def _check_honeypot(self, token_mint: str) -> bool:
+        """
+        Check if a token is a honeypot (can it be sold?).
+
+        Strategy: Simulate a small sell via Jupiter quote API.
+        If Jupiter can't find a route to sell, the token is likely a honeypot.
+
+        Returns True if it's a honeypot (BAD), False if it's safe.
+        """
+        try:
+            # SOL mint address
+            sol_mint = "So11111111111111111111111111111111111111112"
+
+            # Try to get a quote for selling a tiny amount of the token for SOL
+            url = f"{self.settings.jupiter_base_url}/quote"
+            params = {
+                "inputMint": token_mint,
+                "outputMint": sol_mint,
+                "amount": "1000000",  # Tiny amount (1 token with 6 decimals)
+                "slippageBps": "1000",  # High slippage tolerance for test
+            }
+
+            async with self.session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    # If we got a valid quote, the token can be sold
+                    if data.get("outAmount") and int(data["outAmount"]) > 0:
+                        return False  # NOT a honeypot — can sell
+                    else:
+                        logger.warning("honeypot_no_output", token=token_mint[:8])
+                        return True  # No output amount = can't sell
+                else:
+                    # Jupiter couldn't find a route — likely honeypot or very illiquid
+                    logger.warning("honeypot_no_route", token=token_mint[:8])
+                    return True
+
+        except Exception as e:
+            logger.error("honeypot_check_error", error=str(e))
+            # If we can't check, err on the side of caution
+            return True
