@@ -13,6 +13,7 @@ Usage:
     python main.py --discover       # Run token discovery only
     python main.py --analyze        # Run wallet analysis only
     python main.py --dry-run        # Start in dry-run mode (no real trades)
+    python main.py --dashboard      # Launch the web dashboard
 """
 
 import asyncio
@@ -69,8 +70,17 @@ async def main() -> None:
     parser.add_argument("--discover", action="store_true", help="Run token discovery only")
     parser.add_argument("--analyze", action="store_true", help="Run wallet analysis only")
     parser.add_argument("--dry-run", action="store_true", help="Start in dry-run mode")
+    parser.add_argument("--dashboard", action="store_true", help="Launch web dashboard")
     parser.add_argument("--mode", choices=["live", "dry_run", "alert_only"], help="Override trading mode")
     args = parser.parse_args()
+
+    # Dashboard mode — launch web UI and exit (no trading)
+    if args.dashboard:
+        from dashboard.app import run_dashboard
+        setup_logging(log_level=settings.log_level, log_dir="logs")
+        logger.info("launching_dashboard")
+        run_dashboard()
+        return
 
     # Override trading mode if specified
     if args.dry_run:
