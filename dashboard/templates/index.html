@@ -3,32 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SOLANA COPY TRADER // TERMINAL</title>
+    <title>ROME AGENT TRADER</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Inter:wght@300;400;500;600&family=Cinzel:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
         /* ========================================
-           CSS CUSTOM PROPERTIES
+           CSS CUSTOM PROPERTIES — ROMAN THEME
            ======================================== */
         :root {
-            --bg-primary: #0a0a0a;
-            --bg-secondary: #001a00;
-            --bg-card: #0d1a0d;
-            --border-color: #00ff41;
-            --border-dim: #004400;
-            --text-primary: #00ff41;
-            --text-secondary: #00aa2a;
-            --text-dim: #006600;
-            --accent-green: #00ff41;
-            --accent-amber: #ffb000;
-            --accent-red: #ff0040;
-            --glow-green: 0 0 10px #00ff41, 0 0 20px rgba(0,255,65,0.25);
-            --glow-amber: 0 0 10px #ffb000, 0 0 20px rgba(255,176,0,0.25);
-            --glow-red: 0 0 10px #ff0040, 0 0 20px rgba(255,0,64,0.25);
-            --font-mono: 'Fira Code', 'Courier New', monospace;
+            --bg-primary: #f5f0e8;
+            --bg-secondary: #ece6d9;
+            --bg-card: rgba(255, 253, 247, 0.7);
+            --bg-card-hover: rgba(255, 253, 247, 0.9);
+            --border-color: #c4b99a;
+            --border-light: #d9d0bc;
+            --border-gold: #b8960c;
+            --text-primary: #2a2520;
+            --text-secondary: #5a5348;
+            --text-dim: #8a8070;
+            --accent-gold: #b8960c;
+            --accent-gold-light: #d4af37;
+            --accent-green: #2d6b3f;
+            --accent-red: #8b2c2c;
+            --accent-amber: #8b6914;
+            --font-display: 'Cinzel', serif;
+            --font-serif: 'Cormorant Garamond', serif;
+            --font-body: 'Inter', sans-serif;
+            --shadow-card: 0 2px 12px rgba(0,0,0,0.06);
+            --shadow-card-hover: 0 4px 20px rgba(0,0,0,0.1);
+            --texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='%23f5f0e8'/%3E%3Crect width='1' height='1' fill='%23ede8dd' opacity='0.5'/%3E%3C/svg%3E");
         }
 
         /* ========================================
@@ -37,30 +43,120 @@
         *, *::before, *::after { box-sizing: border-box; }
         body {
             background: var(--bg-primary);
+            background-image: var(--texture);
             color: var(--text-primary);
-            font-family: var(--font-mono);
+            font-family: var(--font-body);
             font-size: 13px;
             line-height: 1.6;
             overflow-x: hidden;
             margin: 0;
         }
-
-        /* ========================================
-           CRT SCANLINE OVERLAY
-           ======================================== */
-        body::after {
+        /* Large faint pfp watermark background — like Mozaic's helmet */
+        body::before {
             content: '';
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: repeating-linear-gradient(
-                0deg,
-                rgba(0, 0, 0, 0.15) 0px,
-                rgba(0, 0, 0, 0.15) 1px,
-                transparent 1px,
-                transparent 3px
-            );
+            top: 50%;
+            right: -5%;
+            transform: translateY(-50%);
+            width: 70vh;
+            height: 70vh;
+            background: url('https://avatars.githubusercontent.com/Plasticdev67') center/cover no-repeat;
+            opacity: 0.06;
+            filter: invert(1) grayscale(100%) contrast(0.5) brightness(1.4);
             pointer-events: none;
-            z-index: 9999;
+            z-index: 0;
+        }
+
+        /* ========================================
+           SPLASH SCREEN
+           ======================================== */
+        .splash-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #f0ebe3;
+            background-image:
+                linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+        }
+        .splash-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        .splash-compass {
+            position: absolute;
+            top: 24px;
+            right: 28px;
+            font-size: 20px;
+            color: #b8960c;
+            opacity: 0.6;
+        }
+        .splash-avatar {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            border: none;
+            object-fit: cover;
+            opacity: 0;
+            animation: splashFadeIn 2s ease forwards;
+            /* Invert dark pfp to light outline sketch effect */
+            filter: invert(1) grayscale(100%) contrast(0.6) brightness(1.3);
+            mix-blend-mode: multiply;
+        }
+        .splash-ring {
+            position: absolute;
+            width: 260px;
+            height: 260px;
+            border-radius: 50%;
+            opacity: 0;
+            animation: splashFadeIn 2s ease 0.3s forwards, ringRotate 60s linear infinite;
+        }
+        /* Tick marks around ring — like Mozaic clock face */
+        .splash-ring svg {
+            width: 100%;
+            height: 100%;
+        }
+        .splash-enter {
+            margin-top: 50px;
+            font-family: var(--font-display);
+            font-size: 11px;
+            letter-spacing: 6px;
+            color: #888;
+            text-transform: uppercase;
+            opacity: 0;
+            animation: splashFadeIn 1.5s ease 1.2s forwards, splashPulse 3s ease 2.5s infinite;
+        }
+        @keyframes splashFadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes splashPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        @keyframes ringRotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Compass star in corner */
+        .compass-star {
+            position: fixed;
+            top: 24px;
+            right: 28px;
+            font-size: 18px;
+            color: var(--accent-gold);
+            opacity: 0.5;
+            z-index: 100;
+            cursor: default;
         }
 
         /* ========================================
@@ -68,20 +164,409 @@
            ======================================== */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: var(--bg-primary); }
-        ::-webkit-scrollbar-thumb { background: var(--border-dim); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+        /* ========================================
+           HEADER BAR
+           ======================================== */
+        .header-bar {
+            background: transparent;
+            padding: 24px 0 8px 0;
+            margin-bottom: 0;
+        }
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .brand-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1.5px solid var(--border-color);
+        }
+        .brand-name {
+            font-family: var(--font-display);
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: 4px;
+            color: var(--text-primary);
+        }
+        .brand-subtitle {
+            font-family: var(--font-serif);
+            font-size: 12px;
+            font-style: italic;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+        }
+        .header-status {
+            text-align: right;
+            font-family: var(--font-body);
+        }
+
+        /* ========================================
+           NAVIGATION
+           ======================================== */
+        .nav-roman {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            margin: 16px 0 24px 0;
+            padding: 0;
+            list-style: none;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 12px;
+        }
+        .nav-roman .nav-item { position: relative; }
+        .nav-roman .nav-link {
+            color: var(--text-dim);
+            font-family: var(--font-display);
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            padding: 8px 24px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            border: none;
+            background: none;
+        }
+        .nav-roman .nav-link:hover {
+            color: var(--text-primary);
+        }
+        .nav-roman .nav-link.active {
+            color: var(--accent-gold);
+        }
+        .nav-roman .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 24px;
+            right: 24px;
+            height: 2px;
+            background: var(--accent-gold);
+        }
+        .nav-separator {
+            color: var(--border-color);
+            font-size: 8px;
+            padding: 0 4px;
+        }
+
+        /* ========================================
+           CARDS — GLASS PARCHMENT
+           ======================================== */
+        .rome-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow-card);
+            transition: box-shadow 0.3s ease, transform 0.2s ease;
+        }
+        .rome-card:hover {
+            box-shadow: var(--shadow-card-hover);
+        }
+        .card-header-rome {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-header-rome .title-text {
+            font-family: var(--font-display);
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 3px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+        .card-header-rome .count-text {
+            font-family: var(--font-body);
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+        .card-body-inner { padding: 20px; }
+
+        /* ========================================
+           STAT VALUES & LABELS
+           ======================================== */
+        .stat-value {
+            font-family: var(--font-serif);
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .stat-label {
+            font-family: var(--font-display);
+            color: var(--text-dim);
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 4px;
+        }
+        .stat-mini {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 14px 16px;
+            text-align: center;
+        }
+
+        /* ========================================
+           PNL COLORS
+           ======================================== */
+        .pnl-positive { color: var(--accent-green); font-weight: 500; }
+        .pnl-negative { color: var(--accent-red); font-weight: 500; }
+
+        /* ========================================
+           TABLE STYLES
+           ======================================== */
+        .table {
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 12px;
+            border-collapse: collapse;
+            --bs-table-bg: transparent;
+            --bs-table-color: var(--text-primary);
+            --bs-table-border-color: var(--border-light);
+            --bs-table-hover-bg: rgba(184, 150, 12, 0.04);
+            --bs-table-hover-color: var(--text-primary);
+        }
+        .table thead th {
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-dim);
+            font-family: var(--font-display);
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            padding: 10px 8px;
+            font-weight: 500;
+        }
+        .table td {
+            border-bottom: 1px solid var(--border-light);
+            padding: 8px;
+            vertical-align: middle;
+        }
+        .table-hover tbody tr:hover { cursor: pointer; }
+
+        /* ========================================
+           BADGES
+           ======================================== */
+        .badge-buy {
+            background: var(--accent-green) !important;
+            color: #fff !important;
+            font-weight: 500;
+            font-size: 10px;
+            border-radius: 3px;
+        }
+        .badge-sell {
+            background: var(--accent-amber) !important;
+            color: #fff !important;
+            font-weight: 500;
+            font-size: 10px;
+            border-radius: 3px;
+        }
+        .badge-open {
+            background: var(--accent-green) !important;
+            color: #fff !important;
+            font-size: 10px;
+        }
+        .badge-closed {
+            background: var(--text-dim) !important;
+            font-size: 10px;
+        }
+        .badge-monitored {
+            background: transparent !important;
+            border: 1px solid var(--accent-gold);
+            color: var(--accent-gold) !important;
+            font-size: 9px;
+            letter-spacing: 1px;
+        }
+        .badge-flagged {
+            background: transparent !important;
+            border: 1px solid var(--accent-red);
+            color: var(--accent-red) !important;
+            font-size: 9px;
+        }
+        .badge-mode-live {
+            background: var(--accent-red) !important;
+            color: #fff !important;
+        }
+        .badge-mode-dry {
+            background: var(--accent-amber) !important;
+            color: #fff !important;
+        }
+        .badge-mode-alert {
+            background: var(--text-dim) !important;
+            color: #fff !important;
+        }
+
+        /* ========================================
+           PULSE DOT
+           ======================================== */
+        .pulse-dot {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            animation: pulse-breathe 2s ease-in-out infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .pulse-dot-amber { background: var(--accent-amber); }
+        @keyframes pulse-breathe {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* ========================================
+           SCORE BARS
+           ======================================== */
+        .score-bar {
+            height: 3px;
+            background: var(--border-light);
+            border-radius: 2px;
+            margin-top: 4px;
+        }
+        .score-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        /* ========================================
+           ADDRESS STYLES
+           ======================================== */
+        .addr {
+            font-family: 'Inter', monospace;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        .addr-copy {
+            cursor: pointer;
+            border-bottom: 1px dashed var(--border-color);
+            transition: color 0.2s;
+        }
+        .addr-copy:hover { color: var(--accent-gold); }
+
+        /* ========================================
+           LOADING & EMPTY STATES
+           ======================================== */
+        .loading-text {
+            color: var(--text-dim);
+            text-align: center;
+            padding: 40px;
+            font-family: var(--font-serif);
+            font-size: 16px;
+            font-style: italic;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-dim);
+        }
+        .empty-state h5 {
+            font-family: var(--font-display);
+            font-weight: 500;
+            letter-spacing: 3px;
+            color: var(--text-secondary);
+        }
+        .empty-state code {
+            color: var(--accent-gold);
+            background: var(--bg-secondary);
+            padding: 3px 10px;
+            border: 1px solid var(--border-light);
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        /* ========================================
+           MODAL
+           ======================================== */
+        .terminal-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 5000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .terminal-modal {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 850px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-titlebar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-light);
+            border-radius: 12px 12px 0 0;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-display);
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .modal-close {
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 12px;
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: var(--font-body);
+            padding: 4px 12px;
+            transition: all 0.2s;
+        }
+        .modal-close:hover {
+            background: var(--accent-red);
+            border-color: var(--accent-red);
+            color: #fff;
+        }
+        .modal-body-inner { padding: 24px; }
+
+        /* ========================================
+           CHART CONTAINERS
+           ======================================== */
+        .chart-container { position: relative; padding: 16px; }
+        .chart-container canvas { max-height: 250px; }
+        .chart-small canvas { max-height: 200px; }
 
         /* ========================================
            TICKER BAR
            ======================================== */
         .ticker-bar {
             background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-dim);
+            border-bottom: 1px solid var(--border-light);
             overflow: hidden;
             white-space: nowrap;
             height: 32px;
             line-height: 32px;
-            font-size: 12px;
+            font-size: 11px;
+            color: var(--text-dim);
             position: relative;
         }
         .ticker-content {
@@ -95,328 +580,216 @@
         }
 
         /* ========================================
-           HEADER BAR
+           FADE IN ANIMATION
            ======================================== */
-        .header-bar {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-dim);
-            padding: 12px 0;
-            margin-bottom: 0;
+        .fade-up {
+            opacity: 0;
+            transform: translateY(12px);
+            animation: fadeUp 0.5s ease forwards;
         }
-        .ascii-logo {
-            color: var(--accent-green);
-            font-size: 9px;
-            line-height: 1.1;
-            text-shadow: var(--glow-green);
-            margin: 0;
-            white-space: pre;
+        @keyframes fadeUp {
+            to { opacity: 1; transform: translateY(0); }
         }
+        .fade-up:nth-child(2) { animation-delay: 0.05s; }
+        .fade-up:nth-child(3) { animation-delay: 0.1s; }
+        .fade-up:nth-child(4) { animation-delay: 0.15s; }
 
         /* ========================================
-           NAVIGATION PILLS
+           CUSTOM CURSOR
            ======================================== */
-        .nav-pills { margin-top: 16px; margin-bottom: 16px; }
-        .nav-pills .nav-link {
-            color: var(--text-dim);
-            border: 1px solid transparent;
-            border-radius: 0;
-            font-family: var(--font-mono);
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 8px 16px;
-            transition: all 0.2s;
-        }
-        .nav-pills .nav-link:hover {
-            color: var(--text-primary);
-            border-color: var(--border-dim);
-            background: transparent;
-        }
-        .nav-pills .nav-link.active {
-            background: transparent;
-            color: var(--accent-green);
-            border: 1px solid var(--accent-green);
-            text-shadow: var(--glow-green);
-            box-shadow: 0 0 10px rgba(0,255,65,0.1);
-        }
-
-        /* ========================================
-           TERMINAL CARDS
-           ======================================== */
-        .terminal-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-dim);
-            border-radius: 0;
-            margin-bottom: 16px;
-        }
-        .card-titlebar {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-dim);
-            padding: 4px 12px;
-            font-size: 11px;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .card-titlebar .title-text::before { content: '[ '; }
-        .card-titlebar .title-text::after { content: ' ]'; }
-        .card-body-inner { padding: 16px; }
-
-        /* ========================================
-           STAT VALUES & LABELS
-           ======================================== */
-        .stat-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--accent-green);
-            text-shadow: var(--glow-green);
-            font-family: var(--font-mono);
-        }
-        .stat-label {
-            color: var(--text-dim);
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-        .stat-mini {
-            background: var(--bg-card);
-            border: 1px solid var(--border-dim);
-            padding: 12px 16px;
-            text-align: center;
-        }
-
-        /* ========================================
-           PNL COLORS
-           ======================================== */
-        .pnl-positive { color: var(--accent-green); text-shadow: var(--glow-green); }
-        .pnl-negative { color: var(--accent-red); text-shadow: var(--glow-red); }
-
-        /* ========================================
-           TABLE STYLES
-           ======================================== */
-        .table {
-            color: var(--text-primary);
-            font-family: var(--font-mono);
-            font-size: 12px;
-            border-collapse: collapse;
-            --bs-table-bg: transparent;
-            --bs-table-color: var(--text-primary);
-            --bs-table-border-color: #001a00;
-            --bs-table-hover-bg: rgba(0,255,65,0.05);
-            --bs-table-hover-color: var(--text-primary);
-        }
-        .table thead th {
-            border-bottom: 1px solid var(--border-dim);
-            color: var(--text-dim);
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 8px;
-            font-weight: 400;
-        }
-        .table td {
-            border-bottom: 1px solid #001a00;
-            padding: 6px 8px;
-            vertical-align: middle;
-        }
-        .table-hover tbody tr:hover { cursor: pointer; }
-        .table-hover tbody tr:hover td { color: #fff; }
-
-        /* ========================================
-           BADGES
-           ======================================== */
-        .badge-buy { background: var(--accent-green) !important; color: #000 !important; font-weight: 600; }
-        .badge-sell { background: var(--accent-amber) !important; color: #000 !important; font-weight: 600; }
-        .badge-open { background: var(--accent-green) !important; color: #000 !important; }
-        .badge-closed { background: var(--text-dim) !important; }
-        .badge-monitored {
-            background: transparent !important;
-            border: 1px solid var(--accent-green);
-            color: var(--accent-green) !important;
-        }
-        .badge-flagged {
-            background: transparent !important;
-            border: 1px solid var(--accent-red);
-            color: var(--accent-red) !important;
-        }
-        .badge-mode-live { background: var(--accent-red) !important; color: #fff !important; text-shadow: var(--glow-red); }
-        .badge-mode-dry { background: var(--accent-amber) !important; color: #000 !important; }
-        .badge-mode-alert { background: var(--text-dim) !important; }
-
-        /* ========================================
-           PULSE DOT
-           ======================================== */
-        .pulse-dot {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--accent-green);
-            box-shadow: 0 0 6px var(--accent-green);
-            animation: pulse-breathe 2s ease-in-out infinite;
-            margin-right: 6px;
-            vertical-align: middle;
-        }
-        .pulse-dot-amber {
-            background: var(--accent-amber);
-            box-shadow: 0 0 6px var(--accent-amber);
-        }
-        @keyframes pulse-breathe {
-            0%, 100% { opacity: 1; box-shadow: 0 0 6px currentColor; }
-            50% { opacity: 0.4; box-shadow: 0 0 2px currentColor; }
-        }
-
-        /* ========================================
-           BLINK CURSOR
-           ======================================== */
-        .blink-cursor::after {
-            content: '█';
-            animation: blink 1s step-end infinite;
-            color: var(--accent-green);
-        }
-        @keyframes blink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0; }
-        }
-
-        /* ========================================
-           SCORE BARS
-           ======================================== */
-        .score-bar {
-            height: 4px;
-            background: #001a00;
-            margin-top: 4px;
-        }
-        .score-fill {
-            height: 100%;
-            box-shadow: 0 0 4px currentColor;
-            transition: width 0.5s ease;
-        }
-
-        /* ========================================
-           ADDRESS STYLES
-           ======================================== */
-        .addr {
-            font-family: var(--font-mono);
-            font-size: 11px;
-            color: var(--text-secondary);
-        }
-        .addr-copy {
+        body { cursor: default; }
+        a, button, .addr-copy, .table-hover tbody tr, [onclick] {
             cursor: pointer;
-            border-bottom: 1px dashed var(--text-dim);
-            transition: color 0.2s;
-        }
-        .addr-copy:hover { color: var(--accent-green); }
-
-        /* ========================================
-           LOADING & EMPTY STATES
-           ======================================== */
-        .loading-text {
-            color: var(--text-dim);
-            animation: blink 1s step-end infinite;
-            text-align: center;
-            padding: 40px;
-            font-size: 14px;
-            letter-spacing: 2px;
-        }
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--text-dim);
-        }
-        .empty-state h5 { color: var(--text-secondary); }
-        .empty-state code {
-            color: var(--accent-green);
-            background: var(--bg-secondary);
-            padding: 2px 8px;
-            border: 1px solid var(--border-dim);
         }
 
         /* ========================================
-           MODAL
+           HOVER LIFT EFFECT ON CARDS
            ======================================== */
-        .terminal-modal-overlay {
+        .rome-card {
+            transition: box-shadow 0.3s ease, transform 0.25s ease;
+        }
+        .rome-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-card-hover);
+        }
+
+        /* ========================================
+           SMOOTH PAGE TRANSITIONS
+           ======================================== */
+        [id^="tab-"] {
+            animation: tabFadeIn 0.4s ease;
+        }
+        @keyframes tabFadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ========================================
+           MUSIC TOGGLE
+           ======================================== */
+        .music-toggle {
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 5000;
+            bottom: 24px;
+            right: 28px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
             display: flex;
             align-items: center;
             justify-content: center;
-            animation: fadeIn 0.15s ease;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        .terminal-modal {
-            background: var(--bg-primary);
-            border: 1px solid var(--accent-green);
-            box-shadow: 0 0 30px rgba(0, 255, 65, 0.2), 0 0 60px rgba(0, 255, 65, 0.05);
-            width: 90%;
-            max-width: 850px;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        .modal-titlebar {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-dim);
-            padding: 8px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 12px;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            position: sticky;
-            top: 0;
-            z-index: 1;
-        }
-        .modal-close {
-            color: var(--accent-red);
             cursor: pointer;
-            font-size: 12px;
-            background: none;
-            border: 1px solid var(--accent-red);
-            font-family: var(--font-mono);
-            padding: 2px 8px;
-            transition: all 0.2s;
+            z-index: 200;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-card);
         }
-        .modal-close:hover {
-            background: var(--accent-red);
-            color: #000;
+        .music-toggle:hover {
+            background: var(--bg-secondary);
+            transform: scale(1.1);
         }
-        .modal-body-inner { padding: 20px; }
-
-        /* ========================================
-           CHART CONTAINERS
-           ======================================== */
-        .chart-container { position: relative; padding: 12px; }
-        .chart-container canvas { max-height: 250px; }
-        .chart-small canvas { max-height: 200px; }
+        .music-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 14px;
+        }
+        .music-bars .bar {
+            width: 3px;
+            background: var(--accent-gold);
+            border-radius: 1px;
+            transition: height 0.2s ease;
+        }
+        .music-bars.playing .bar:nth-child(1) { animation: musicBar 0.8s ease infinite; }
+        .music-bars.playing .bar:nth-child(2) { animation: musicBar 0.6s ease 0.1s infinite; }
+        .music-bars.playing .bar:nth-child(3) { animation: musicBar 0.7s ease 0.2s infinite; }
+        .music-bars.playing .bar:nth-child(4) { animation: musicBar 0.5s ease 0.15s infinite; }
+        .music-bars:not(.playing) .bar { height: 3px !important; }
+        @keyframes musicBar {
+            0%, 100% { height: 4px; }
+            50% { height: 14px; }
+        }
 
         /* ========================================
            RESPONSIVE
            ======================================== */
         @media (max-width: 768px) {
-            .ascii-logo { display: none; }
-            .stat-value { font-size: 1.2rem; }
+            .brand-name { font-size: 16px; letter-spacing: 2px; }
+            .stat-value { font-size: 1.4rem; }
+            .nav-roman .nav-link { padding: 8px 12px; font-size: 9px; letter-spacing: 1px; }
+        }
+
+        /* ========================================
+           HERO QUOTE
+           ======================================== */
+        .hero-quote {
+            font-family: var(--font-serif);
+            font-size: 22px;
+            font-style: italic;
+            font-weight: 300;
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 8px 40px 20px;
+            line-height: 1.4;
+        }
+        .hero-quote .attr {
+            display: block;
+            font-size: 11px;
+            font-style: normal;
+            color: var(--text-dim);
+            letter-spacing: 2px;
+            margin-top: 8px;
+            font-family: var(--font-display);
         }
     </style>
 </head>
 <body>
 
-<!-- Matrix Rain Canvas Background -->
-<canvas id="matrix-rain" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:-1; opacity:0.15; pointer-events:none;"></canvas>
+<!-- ============================================
+     SPLASH SCREEN
+     ============================================ -->
+<div class="splash-screen" id="splash" onclick="enterApp()">
+    <div class="splash-compass">&#10022;</div>
+    <div class="splash-ring">
+        <svg viewBox="0 0 260 260">
+            <circle cx="130" cy="130" r="125" fill="none" stroke="#c4b99a" stroke-width="0.5"/>
+            <!-- Tick marks like a clock/compass -->
+            <g stroke="#b0a68e" stroke-width="1">
+                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(0,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(6,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(12,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(18,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(24,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(30,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(36,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(42,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(48,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(54,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(60,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(66,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(72,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(78,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(84,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(90,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(96,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(102,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(108,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(114,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(120,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(126,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(132,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(138,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(144,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(150,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(156,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(162,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(168,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(174,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(180,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(186,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(192,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(198,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(204,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(210,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(216,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(222,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(228,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(234,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(240,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(246,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(252,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(258,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(264,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(270,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(276,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(282,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(288,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(294,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(300,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(306,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(312,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(318,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(324,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(330,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(336,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(342,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(348,130,130)"/>
+                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(354,130,130)"/>
+            </g>
+        </svg>
+    </div>
+    <img src="https://avatars.githubusercontent.com/Plasticdev67" alt="Rome" class="splash-avatar">
+    <div class="splash-enter">Enter Rome</div>
+</div>
+
+<!-- Compass Star -->
+<div class="compass-star" title="Rome Agent Trader">&#10022;</div>
 
 <!-- Trade Ticker -->
 <div class="ticker-bar">
     <div class="ticker-content" id="ticker-content">
-        INITIALIZING TRADE FEED . . .
+        <span style="letter-spacing: 2px;">AWAITING TRADE SIGNALS . . .</span>
     </div>
 </div>
 
@@ -424,23 +797,23 @@
 <div class="header-bar">
     <div class="container-fluid px-4">
         <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <pre class="ascii-logo"> ____   ___  _        _    _   _    _        ____ ___  ______   __
-/ ___| / _ \| |      / \  | \ | |  / \      / ___/ _ \|  _ \ \ / /
-\___ \| | | | |     / _ \ |  \| | / _ \    | |  | | | | |_) \ V /
- ___) | |_| | |___ / ___ \| |\  |/ ___ \   | |__| |_| |  __/ | |
-|____/ \___/|_____/_/   \_\_| \_/_/   \_\   \____\___/|_|    |_|</pre>
+            <div class="header-brand">
+                <img src="https://avatars.githubusercontent.com/Plasticdev67" alt="Rome" class="brand-avatar">
+                <div>
+                    <div class="brand-name">ROME AGENT TRADER</div>
+                    <div class="brand-subtitle">Veni, Vidi, Traded</div>
+                </div>
             </div>
-            <div style="text-align: right; min-width: 200px;">
+            <div class="header-status">
                 <div>
                     <span class="pulse-dot" id="status-dot"></span>
-                    <span id="status-text" style="font-size: 13px; letter-spacing: 1px;">INITIALIZING</span>
+                    <span id="status-text" style="font-size: 12px; letter-spacing: 1px; font-weight: 500;">INITIALIZING</span>
                 </div>
-                <div style="margin-top: 6px;">
+                <div style="margin-top: 4px;">
                     <span id="mode-badge" style="font-size: 11px; color: var(--accent-amber); letter-spacing: 1px;">---</span>
                 </div>
-                <div style="margin-top: 6px; font-size: 10px; color: var(--text-dim);" id="last-refresh">
-                    LAST SYNC: --:--:--
+                <div style="margin-top: 4px; font-size: 10px; color: var(--text-dim);" id="last-refresh">
+                    Last sync: --:--:--
                 </div>
             </div>
         </div>
@@ -448,25 +821,36 @@
 </div>
 
 <div class="container-fluid px-4">
-    <!-- Navigation Tabs -->
-    <ul class="nav nav-pills" id="mainTabs">
+    <!-- Hero Quote -->
+    <div class="hero-quote fade-up">
+        "The die is cast."
+        <span class="attr">Julius Caesar</span>
+    </div>
+
+    <!-- Navigation -->
+    <ul class="nav-roman" id="mainTabs">
         <li class="nav-item">
-            <a class="nav-link active" href="#" data-tab="overview">&gt; overview</a>
+            <a class="nav-link active" href="#" data-tab="overview">Overview</a>
         </li>
+        <li class="nav-separator">&#9670;</li>
         <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="wallets">&gt; wallets</a>
+            <a class="nav-link" href="#" data-tab="wallets">Wallets</a>
         </li>
+        <li class="nav-separator">&#9670;</li>
         <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="tokens">&gt; tokens</a>
+            <a class="nav-link" href="#" data-tab="tokens">Tokens</a>
         </li>
+        <li class="nav-separator">&#9670;</li>
         <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="trades">&gt; trades</a>
+            <a class="nav-link" href="#" data-tab="trades">Trades</a>
         </li>
+        <li class="nav-separator">&#9670;</li>
         <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="positions">&gt; positions</a>
+            <a class="nav-link" href="#" data-tab="positions">Positions</a>
         </li>
+        <li class="nav-separator">&#9670;</li>
         <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="clusters">&gt; clusters</a>
+            <a class="nav-link" href="#" data-tab="clusters">Clusters</a>
         </li>
     </ul>
 
@@ -482,52 +866,33 @@
 <!-- Modal Container -->
 <div id="modal-container"></div>
 
+<!-- Music Toggle -->
+<div class="music-toggle" id="musicToggle" onclick="toggleMusic()" title="Toggle ambient music">
+    <div class="music-bars" id="musicBars">
+        <div class="bar" style="height:4px;"></div>
+        <div class="bar" style="height:4px;"></div>
+        <div class="bar" style="height:4px;"></div>
+        <div class="bar" style="height:4px;"></div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // =========================================================================
-// Chart.js Global Defaults — Terminal Theme
+// Chart.js Global Defaults — Roman Theme
 // =========================================================================
-Chart.defaults.color = '#006600';
-Chart.defaults.font.family = "'Fira Code', monospace";
+Chart.defaults.color = '#8a8070';
+Chart.defaults.font.family = "'Inter', sans-serif";
 Chart.defaults.font.size = 11;
 
 // =========================================================================
-// Matrix Rain Background
+// Splash Screen
 // =========================================================================
-function initMatrixRain() {
-    const canvas = document.getElementById('matrix-rain');
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    const chars = 'アイウエオカキクケコサシスセソタチツテト0123456789ABCDEF';
-    const fontSize = 14;
-    let columns = Math.floor(canvas.width / fontSize);
-    let drops = Array(columns).fill(1);
-
-    function draw() {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#00ff41';
-        ctx.font = fontSize + 'px monospace';
-        for (let i = 0; i < drops.length; i++) {
-            const text = chars[Math.floor(Math.random() * chars.length)];
-            ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-            if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-                drops[i] = 0;
-            }
-            drops[i]++;
-        }
-    }
-    setInterval(draw, 50);
-    window.addEventListener('resize', () => {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        columns = Math.floor(canvas.width / fontSize);
-        drops = Array(columns).fill(1);
-    });
+function enterApp() {
+    document.getElementById('splash').classList.add('hidden');
 }
-initMatrixRain();
+// Auto-dismiss splash after 5s
+setTimeout(() => { enterApp(); }, 5000);
 
 // =========================================================================
 // Tab Navigation
@@ -552,12 +917,12 @@ tabs.forEach(tab => {
 // Helpers
 // =========================================================================
 function fmt(n, decimals = 4) {
-    if (n === null || n === undefined) return '—';
+    if (n === null || n === undefined) return '\u2014';
     return Number(n).toFixed(decimals);
 }
 
 function fmtPnl(n) {
-    if (n === null || n === undefined) return '<span style="color:var(--text-dim)">—</span>';
+    if (n === null || n === undefined) return '<span style="color:var(--text-dim)">\u2014</span>';
     const v = Number(n);
     const cls = v >= 0 ? 'pnl-positive' : 'pnl-negative';
     const sign = v >= 0 ? '+' : '';
@@ -565,7 +930,7 @@ function fmtPnl(n) {
 }
 
 function fmtUsd(n) {
-    if (!n) return '<span style="color:var(--text-dim)">—</span>';
+    if (!n) return '<span style="color:var(--text-dim)">\u2014</span>';
     const v = Number(n);
     if (v >= 1_000_000) return '$' + (v / 1_000_000).toFixed(2) + 'M';
     if (v >= 1_000) return '$' + (v / 1_000).toFixed(1) + 'K';
@@ -574,15 +939,15 @@ function fmtUsd(n) {
 }
 
 function shortAddr(addr) {
-    if (!addr || addr.length < 12) return addr || '—';
-    return addr.slice(0, 6) + '···' + addr.slice(-4);
+    if (!addr || addr.length < 12) return addr || '\u2014';
+    return addr.slice(0, 6) + '\u00b7\u00b7\u00b7' + addr.slice(-4);
 }
 
 function scoreColor(score) {
-    if (score >= 80) return '#00ff41';
-    if (score >= 60) return '#00aa2a';
-    if (score >= 40) return '#ffb000';
-    return '#ff0040';
+    if (score >= 80) return '#2d6b3f';
+    if (score >= 60) return '#4a8c5c';
+    if (score >= 40) return '#8b6914';
+    return '#8b2c2c';
 }
 
 async function fetchApi(endpoint) {
@@ -598,7 +963,7 @@ async function fetchApi(endpoint) {
 function updateRefreshTimer() {
     const now = new Date();
     document.getElementById('last-refresh').textContent =
-        'LAST SYNC: ' + now.toLocaleTimeString('en-US', { hour12: false });
+        'Last sync: ' + now.toLocaleTimeString('en-US', { hour12: false });
 }
 
 // =========================================================================
@@ -630,7 +995,7 @@ function animateCounter(elementId, newValue, decimals = 4) {
 function updateTicker(trades) {
     const el = document.getElementById('ticker-content');
     if (!trades || trades.length === 0) {
-        el.innerHTML = '[ NO RECENT TRADES ] &nbsp;&nbsp;&nbsp; AWAITING SIGNALS . . .';
+        el.innerHTML = '<span style="letter-spacing:2px;">AWAITING TRADE SIGNALS . . .</span>';
         return;
     }
     const items = trades.map(t => {
@@ -639,10 +1004,9 @@ function updateTicker(trades) {
         const amount = Number(t.amount_sol).toFixed(4);
         const color = t.side === 'buy' ? 'var(--accent-green)' : 'var(--accent-amber)';
         const time = t.created_at ? t.created_at.split('T').pop().split('.')[0] : '';
-        return `<span style="color:${color}">${side}</span> ${symbol} ${amount} SOL <span style="color:var(--text-dim)">${time}</span>`;
+        return `<span style="color:${color}; font-weight:500;">${side}</span> ${symbol} ${amount} SOL <span style="color:var(--text-dim)">${time}</span>`;
     });
-    el.innerHTML = items.join(' &nbsp;│&nbsp; ') + ' &nbsp;│&nbsp; ' + items.join(' &nbsp;│&nbsp; ');
-    // Adjust speed based on content
+    el.innerHTML = items.join(' &nbsp;\u2022&nbsp; ') + ' &nbsp;\u2022&nbsp; ' + items.join(' &nbsp;\u2022&nbsp; ');
     el.style.animationDuration = Math.max(20, items.length * 4) + 's';
 }
 
@@ -655,8 +1019,8 @@ function copyAddr(address, event) {
         const el = event ? event.target : null;
         if (el) {
             const orig = el.textContent;
-            el.textContent = 'COPIED!';
-            el.style.color = 'var(--accent-green)';
+            el.textContent = 'Copied!';
+            el.style.color = 'var(--accent-gold)';
             setTimeout(() => { el.textContent = orig; el.style.color = ''; }, 1000);
         }
     });
@@ -670,8 +1034,8 @@ function showModal(titleText, bodyHTML) {
         <div class="terminal-modal-overlay" onclick="closeModal(event)">
             <div class="terminal-modal" onclick="event.stopPropagation()">
                 <div class="modal-titlebar">
-                    <span>[ ${titleText} ]</span>
-                    <button class="modal-close" onclick="closeModal()">[X] CLOSE</button>
+                    <span>${titleText}</span>
+                    <button class="modal-close" onclick="closeModal()">Close</button>
                 </div>
                 <div class="modal-body-inner">${bodyHTML}</div>
             </div>
@@ -684,7 +1048,6 @@ function closeModal(event) {
     document.getElementById('modal-container').innerHTML = '';
 }
 
-// Close modal on Escape
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') document.getElementById('modal-container').innerHTML = '';
 });
@@ -698,10 +1061,10 @@ function renderScoreBar(label, score) {
     return `
         <div style="margin-bottom:8px;">
             <div style="display:flex; justify-content:space-between; font-size:10px;">
-                <span style="color:var(--text-dim)">${label}</span>
-                <span style="color:${color}">${s.toFixed(0)}</span>
+                <span style="color:var(--text-dim); font-family:var(--font-display); letter-spacing:1px; font-size:9px;">${label}</span>
+                <span style="color:${color}; font-weight:500;">${s.toFixed(0)}</span>
             </div>
-            <div class="score-bar"><div class="score-fill" style="width:${s}%; background:${color}; color:${color};"></div></div>
+            <div class="score-bar"><div class="score-fill" style="width:${s}%; background:${color};"></div></div>
         </div>
     `;
 }
@@ -710,17 +1073,17 @@ function renderScoreBar(label, score) {
 // Wallet Detail Modal
 // =========================================================================
 async function showWalletDetail(address) {
-    showModal('LOADING', '<div class="loading-text">QUERYING WALLET DATA . . .</div>');
+    showModal('Loading...', '<div class="loading-text">Querying wallet data...</div>');
     const data = await fetchApi('/api/wallet/' + encodeURIComponent(address));
     if (!data || !data.wallet) { closeModal(); return; }
 
     const w = data.wallet;
     let html = `
         <div style="margin-bottom:20px;">
-            <div style="color:var(--text-dim); font-size:10px; letter-spacing:2px;">WALLET ADDRESS</div>
+            <div style="color:var(--text-dim); font-family:var(--font-display); font-size:9px; letter-spacing:2px;">WALLET ADDRESS</div>
             <div class="addr-copy" onclick="copyAddr('${w.address}', event)"
                  style="font-size:13px; word-break:break-all; margin-top:4px;">
-                ${w.address} <span style="color:var(--text-dim); font-size:9px;">[CLICK TO COPY]</span>
+                ${w.address} <span style="color:var(--text-dim); font-size:9px;">[click to copy]</span>
             </div>
         </div>
 
@@ -734,7 +1097,7 @@ async function showWalletDetail(address) {
         <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:20px;">
             <div class="stat-mini">
                 <div class="stat-label">TOTAL SCORE</div>
-                <div style="font-size:1.4rem; font-weight:700; color:${scoreColor(w.total_score)}; text-shadow:0 0 10px ${scoreColor(w.total_score)};">${w.total_score.toFixed(0)}</div>
+                <div style="font-size:1.4rem; font-weight:600; color:${scoreColor(w.total_score)};">${w.total_score.toFixed(0)}</div>
             </div>
             <div class="stat-mini">
                 <div class="stat-label">TOTAL PNL</div>
@@ -742,19 +1105,18 @@ async function showWalletDetail(address) {
             </div>
             <div class="stat-mini">
                 <div class="stat-label">WIN RATE</div>
-                <div style="font-size:1.4rem; font-weight:700; color:var(--accent-green);">${w.win_rate.toFixed(0)}%</div>
+                <div style="font-size:1.4rem; font-weight:600; color:var(--accent-green);">${w.win_rate.toFixed(0)}%</div>
             </div>
             <div class="stat-mini">
                 <div class="stat-label">TRADES</div>
-                <div style="font-size:1.4rem; font-weight:700; color:var(--text-secondary);">${w.total_trades}</div>
+                <div style="font-size:1.4rem; font-weight:600; color:var(--text-secondary);">${w.total_trades}</div>
             </div>
         </div>
     `;
 
-    // Token trades
     if (data.token_trades.length > 0) {
         html += `
-            <div style="color:var(--text-dim); font-size:10px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-dim); padding-bottom:4px;">
+            <div style="color:var(--text-dim); font-family:var(--font-display); font-size:9px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-light); padding-bottom:4px;">
                 TOKEN TRADES (${data.token_trades.length})
             </div>
             <div class="table-responsive" style="margin-bottom:20px;">
@@ -769,7 +1131,7 @@ async function showWalletDetail(address) {
                             <td>${fmt(t.buy_amount_sol, 4)}</td>
                             <td>${fmt(t.sell_amount_sol, 4)}</td>
                             <td>${fmtPnl(t.pnl_sol)}</td>
-                            <td>${t.entry_rank || '—'}</td>
+                            <td>${t.entry_rank || '\u2014'}</td>
                         </tr>`).join('')}
                     </tbody>
                 </table>
@@ -777,11 +1139,10 @@ async function showWalletDetail(address) {
         `;
     }
 
-    // Copy trades
     if (data.copy_trades.length > 0) {
         html += `
-            <div style="color:var(--text-dim); font-size:10px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-dim); padding-bottom:4px;">
-                COPY TRADES TRIGGERED (${data.copy_trades.length})
+            <div style="color:var(--text-dim); font-family:var(--font-display); font-size:9px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-light); padding-bottom:4px;">
+                TRADES TRIGGERED (${data.copy_trades.length})
             </div>
             <div class="table-responsive">
                 <table class="table table-sm mb-0">
@@ -796,7 +1157,7 @@ async function showWalletDetail(address) {
                             <td>${fmt(t.amount_sol, 6)}</td>
                             <td>${fmtUsd(t.price_usd)}</td>
                             <td>${t.status}</td>
-                            <td style="white-space:nowrap">${t.created_at || '—'}</td>
+                            <td style="white-space:nowrap">${t.created_at || '\u2014'}</td>
                         </tr>`).join('')}
                     </tbody>
                 </table>
@@ -804,14 +1165,14 @@ async function showWalletDetail(address) {
         `;
     }
 
-    showModal('WALLET :: ' + shortAddr(w.address), html);
+    showModal('Wallet \u2014 ' + shortAddr(w.address), html);
 }
 
 // =========================================================================
 // Token Detail Modal
 // =========================================================================
 async function showTokenDetail(mint) {
-    showModal('LOADING', '<div class="loading-text">QUERYING TOKEN DATA . . .</div>');
+    showModal('Loading...', '<div class="loading-text">Querying token data...</div>');
     const data = await fetchApi('/api/token/' + encodeURIComponent(mint));
     if (!data || !data.token) { closeModal(); return; }
 
@@ -819,12 +1180,12 @@ async function showTokenDetail(mint) {
     let html = `
         <div style="margin-bottom:20px;">
             <div style="display:flex; align-items:baseline; gap:12px;">
-                <span style="font-size:1.4rem; font-weight:700; color:var(--accent-green); text-shadow:var(--glow-green);">${t.symbol || '???'}</span>
-                <span style="color:var(--text-dim); font-size:12px;">${t.name || ''}</span>
+                <span style="font-family:var(--font-display); font-size:1.2rem; font-weight:600; color:var(--text-primary);">${t.symbol || '???'}</span>
+                <span style="color:var(--text-dim); font-size:12px; font-family:var(--font-serif); font-style:italic;">${t.name || ''}</span>
             </div>
             <div class="addr-copy" onclick="copyAddr('${t.mint_address}', event)"
                  style="font-size:11px; word-break:break-all; margin-top:4px; color:var(--text-dim);">
-                ${t.mint_address} <span style="font-size:9px;">[CLICK TO COPY]</span>
+                ${t.mint_address} <span style="font-size:9px;">[click to copy]</span>
             </div>
         </div>
 
@@ -843,8 +1204,8 @@ async function showTokenDetail(mint) {
             </div>
             <div class="stat-mini">
                 <div class="stat-label">MULTIPLIER</div>
-                <div style="font-size:1.1rem; color:var(--accent-green); text-shadow:var(--glow-green);">
-                    ${t.price_multiplier ? t.price_multiplier.toFixed(1) + 'x' : '—'}
+                <div style="font-size:1.1rem; color:var(--accent-gold); font-weight:600;">
+                    ${t.price_multiplier ? t.price_multiplier.toFixed(1) + 'x' : '\u2014'}
                 </div>
             </div>
         </div>
@@ -855,19 +1216,18 @@ async function showTokenDetail(mint) {
             </div>
             <div class="stat-mini">
                 <div class="stat-label">HOLDERS</div>
-                <div style="color:var(--text-secondary);">${t.holder_count || '—'}</div>
+                <div style="color:var(--text-secondary);">${t.holder_count || '\u2014'}</div>
             </div>
             <div class="stat-mini">
                 <div class="stat-label">SOURCE</div>
-                <div style="color:var(--accent-amber);">${t.data_source || '—'}</div>
+                <div style="color:var(--accent-amber);">${t.data_source || '\u2014'}</div>
             </div>
         </div>
     `;
 
-    // Wallets that traded this token
     if (data.wallet_trades.length > 0) {
         html += `
-            <div style="color:var(--text-dim); font-size:10px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-dim); padding-bottom:4px;">
+            <div style="color:var(--text-dim); font-family:var(--font-display); font-size:9px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-light); padding-bottom:4px;">
                 WALLETS THAT TRADED (${data.wallet_trades.length})
             </div>
             <div class="table-responsive" style="margin-bottom:20px;">
@@ -879,10 +1239,10 @@ async function showTokenDetail(mint) {
                         ${data.wallet_trades.map(wt => `
                         <tr>
                             <td class="addr">${shortAddr(wt.wallet_address)}</td>
-                            <td><span style="color:${scoreColor(wt.total_score || 0)}">${wt.total_score ? wt.total_score.toFixed(0) : '—'}</span></td>
+                            <td><span style="color:${scoreColor(wt.total_score || 0)}">${wt.total_score ? wt.total_score.toFixed(0) : '\u2014'}</span></td>
                             <td>${fmt(wt.buy_amount_sol, 4)}</td>
                             <td>${fmtPnl(wt.pnl_sol)}</td>
-                            <td>${wt.entry_rank || '—'}</td>
+                            <td>${wt.entry_rank || '\u2014'}</td>
                             <td>${wt.is_monitored ? '<span class="badge badge-monitored">MON</span>' : ''}</td>
                         </tr>`).join('')}
                     </tbody>
@@ -891,11 +1251,10 @@ async function showTokenDetail(mint) {
         `;
     }
 
-    // Copy trades on this token
     if (data.copy_trades.length > 0) {
         html += `
-            <div style="color:var(--text-dim); font-size:10px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-dim); padding-bottom:4px;">
-                COPY TRADES (${data.copy_trades.length})
+            <div style="color:var(--text-dim); font-family:var(--font-display); font-size:9px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-light); padding-bottom:4px;">
+                TRADES (${data.copy_trades.length})
             </div>
             <div class="table-responsive">
                 <table class="table table-sm mb-0">
@@ -910,7 +1269,7 @@ async function showTokenDetail(mint) {
                             <td>${fmtUsd(ct.price_usd)}</td>
                             <td class="addr">${shortAddr(ct.triggered_by_wallet)}</td>
                             <td>${ct.status}</td>
-                            <td style="white-space:nowrap">${ct.created_at || '—'}</td>
+                            <td style="white-space:nowrap">${ct.created_at || '\u2014'}</td>
                         </tr>`).join('')}
                     </tbody>
                 </table>
@@ -918,7 +1277,7 @@ async function showTokenDetail(mint) {
         `;
     }
 
-    showModal('TOKEN :: ' + (t.symbol || shortAddr(t.mint_address)), html);
+    showModal('Token \u2014 ' + (t.symbol || shortAddr(t.mint_address)), html);
 }
 
 // =========================================================================
@@ -936,7 +1295,7 @@ function destroyChart(chart) {
 }
 
 // =========================================================================
-// Chart: PnL (enhanced terminal theme)
+// Chart: PnL
 // =========================================================================
 async function loadPnlChart() {
     const data = await fetchApi('/api/daily_pnl');
@@ -945,7 +1304,6 @@ async function loadPnlChart() {
 
     pnlChart = destroyChart(pnlChart);
     const days = data.daily_pnl;
-
     if (days.length === 0) return;
 
     let cumulative = 0;
@@ -953,8 +1311,8 @@ async function loadPnlChart() {
 
     const ctx = canvas.getContext('2d');
     const gradient = ctx.createLinearGradient(0, 0, 0, 250);
-    gradient.addColorStop(0, 'rgba(0, 255, 65, 0.2)');
-    gradient.addColorStop(1, 'rgba(0, 255, 65, 0)');
+    gradient.addColorStop(0, 'rgba(184, 150, 12, 0.15)');
+    gradient.addColorStop(1, 'rgba(184, 150, 12, 0)');
 
     pnlChart = new Chart(canvas, {
         type: 'line',
@@ -964,11 +1322,11 @@ async function loadPnlChart() {
                 {
                     label: 'Daily PnL (SOL)',
                     data: days.map(d => d.total_pnl_sol),
-                    borderColor: '#00ff41',
+                    borderColor: '#b8960c',
                     backgroundColor: gradient,
                     borderWidth: 2,
-                    pointBackgroundColor: '#00ff41',
-                    pointBorderColor: '#00ff41',
+                    pointBackgroundColor: '#b8960c',
+                    pointBorderColor: '#b8960c',
                     pointRadius: 3,
                     pointHoverRadius: 6,
                     tension: 0.3,
@@ -977,8 +1335,8 @@ async function loadPnlChart() {
                 {
                     label: 'Cumulative PnL (SOL)',
                     data: cumulativeData,
-                    borderColor: '#ffb000',
-                    backgroundColor: 'rgba(255,176,0,0.05)',
+                    borderColor: '#2d6b3f',
+                    backgroundColor: 'rgba(45,107,63,0.05)',
                     borderWidth: 2,
                     pointRadius: 2,
                     tension: 0.3,
@@ -989,11 +1347,11 @@ async function loadPnlChart() {
         options: {
             responsive: true,
             plugins: {
-                legend: { labels: { color: '#006600', font: { size: 11 } } }
+                legend: { labels: { color: '#8a8070', font: { size: 11 } } }
             },
             scales: {
-                x: { ticks: { color: '#004400' }, grid: { color: '#001a00' } },
-                y: { ticks: { color: '#004400' }, grid: { color: '#001a00' } }
+                x: { ticks: { color: '#8a8070' }, grid: { color: '#e8e0d0' } },
+                y: { ticks: { color: '#8a8070' }, grid: { color: '#e8e0d0' } }
             }
         }
     });
@@ -1010,8 +1368,7 @@ async function loadWalletScoreChart() {
     walletScoreChart = destroyChart(walletScoreChart);
     const dist = data.distribution;
 
-    const barColors = ['#ff0040', '#ffb000', '#ffb000', '#00aa2a', '#00ff41'];
-    const borderColors = barColors.map(c => c);
+    const barColors = ['#8b2c2c', '#8b6914', '#8b6914', '#4a8c5c', '#2d6b3f'];
 
     walletScoreChart = new Chart(canvas, {
         type: 'bar',
@@ -1020,20 +1377,21 @@ async function loadWalletScoreChart() {
             datasets: [{
                 label: 'Wallets',
                 data: dist.map(d => d.count),
-                backgroundColor: barColors.map(c => c + '60'),
-                borderColor: borderColors,
+                backgroundColor: barColors.map(c => c + '40'),
+                borderColor: barColors,
                 borderWidth: 1,
+                borderRadius: 3,
             }]
         },
         options: {
             responsive: true,
             plugins: {
                 legend: { display: false },
-                title: { display: true, text: 'SCORE DISTRIBUTION', color: '#006600', font: { size: 10 } }
+                title: { display: true, text: 'Score Distribution', color: '#5a5348', font: { size: 11, family: "'Inter', sans-serif" } }
             },
             scales: {
-                x: { ticks: { color: '#004400' }, grid: { display: false } },
-                y: { ticks: { color: '#004400' }, grid: { color: '#001a00' }, beginAtZero: true }
+                x: { ticks: { color: '#8a8070' }, grid: { display: false } },
+                y: { ticks: { color: '#8a8070' }, grid: { color: '#e8e0d0' }, beginAtZero: true }
             }
         }
     });
@@ -1056,8 +1414,8 @@ function loadWinLossChart(stats) {
             labels: ['Wins', 'Losses'],
             datasets: [{
                 data: [wl.wins || 0, wl.losses || 0],
-                backgroundColor: ['rgba(0,255,65,0.6)', 'rgba(255,0,64,0.6)'],
-                borderColor: ['#00ff41', '#ff0040'],
+                backgroundColor: ['rgba(45,107,63,0.6)', 'rgba(139,44,44,0.6)'],
+                borderColor: ['#2d6b3f', '#8b2c2c'],
                 borderWidth: 1,
             }]
         },
@@ -1066,7 +1424,7 @@ function loadWinLossChart(stats) {
             cutout: '70%',
             plugins: {
                 legend: { display: false },
-                title: { display: true, text: 'WIN / LOSS', color: '#006600', font: { size: 10 } }
+                title: { display: true, text: 'Win / Loss', color: '#5a5348', font: { size: 11 } }
             }
         },
         plugins: [{
@@ -1075,12 +1433,10 @@ function loadWinLossChart(stats) {
                 const { ctx, width, height } = chart;
                 const rate = total > 0 ? ((wl.wins / total) * 100).toFixed(0) : '0';
                 ctx.save();
-                ctx.font = "bold 20px 'Fira Code', monospace";
-                ctx.fillStyle = '#00ff41';
+                ctx.font = "600 22px 'Cormorant Garamond', serif";
+                ctx.fillStyle = '#2d6b3f';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.shadowColor = '#00ff41';
-                ctx.shadowBlur = 10;
                 ctx.fillText(rate + '%', width / 2, height / 2);
                 ctx.restore();
             }
@@ -1107,28 +1463,30 @@ function loadTradeActivityChart(stats) {
                 {
                     label: 'Buys',
                     data: days.map(d => d.buys),
-                    backgroundColor: 'rgba(0,255,65,0.5)',
-                    borderColor: '#00ff41',
+                    backgroundColor: 'rgba(45,107,63,0.4)',
+                    borderColor: '#2d6b3f',
                     borderWidth: 1,
+                    borderRadius: 2,
                 },
                 {
                     label: 'Sells',
                     data: days.map(d => d.sells),
-                    backgroundColor: 'rgba(255,176,0,0.5)',
-                    borderColor: '#ffb000',
+                    backgroundColor: 'rgba(139,105,20,0.4)',
+                    borderColor: '#8b6914',
                     borderWidth: 1,
+                    borderRadius: 2,
                 }
             ]
         },
         options: {
             responsive: true,
             plugins: {
-                legend: { labels: { color: '#006600', font: { size: 10 } } },
-                title: { display: true, text: 'TRADE ACTIVITY (30D)', color: '#006600', font: { size: 10 } }
+                legend: { labels: { color: '#8a8070', font: { size: 10 } } },
+                title: { display: true, text: 'Trade Activity (30D)', color: '#5a5348', font: { size: 11 } }
             },
             scales: {
-                x: { stacked: true, ticks: { color: '#004400' }, grid: { display: false } },
-                y: { stacked: true, ticks: { color: '#004400' }, grid: { color: '#001a00' }, beginAtZero: true }
+                x: { stacked: true, ticks: { color: '#8a8070' }, grid: { display: false } },
+                y: { stacked: true, ticks: { color: '#8a8070' }, grid: { color: '#e8e0d0' }, beginAtZero: true }
             }
         }
     });
@@ -1145,7 +1503,7 @@ function loadPortfolioChart(stats) {
     const alloc = stats.portfolio_allocation;
     if (alloc.length === 0) return;
 
-    const greens = ['#00ff41', '#00cc33', '#00aa2a', '#008822', '#006619', '#004411', '#003300'];
+    const palette = ['#b8960c', '#2d6b3f', '#8b6914', '#5a7d6a', '#c4a84d', '#3d8b5c', '#a68a3c'];
 
     portfolioChart = new Chart(canvas, {
         type: 'doughnut',
@@ -1153,8 +1511,8 @@ function loadPortfolioChart(stats) {
             labels: alloc.map(a => a.token_symbol),
             datasets: [{
                 data: alloc.map(a => a.amount_sol),
-                backgroundColor: alloc.map((_, i) => (greens[i % greens.length]) + '80'),
-                borderColor: alloc.map((_, i) => greens[i % greens.length]),
+                backgroundColor: alloc.map((_, i) => (palette[i % palette.length]) + '60'),
+                borderColor: alloc.map((_, i) => palette[i % palette.length]),
                 borderWidth: 1,
             }]
         },
@@ -1162,8 +1520,8 @@ function loadPortfolioChart(stats) {
             responsive: true,
             cutout: '60%',
             plugins: {
-                legend: { position: 'right', labels: { color: '#006600', font: { size: 10 }, padding: 8 } },
-                title: { display: true, text: 'PORTFOLIO', color: '#006600', font: { size: 10 } }
+                legend: { position: 'right', labels: { color: '#8a8070', font: { size: 10 }, padding: 8 } },
+                title: { display: true, text: 'Portfolio', color: '#5a5348', font: { size: 11 } }
             }
         }
     });
@@ -1194,145 +1552,139 @@ async function loadOverview() {
 
     if (!data) return;
 
-    // Update header
     const statusText = document.getElementById('status-text');
     const statusDot = document.getElementById('status-dot');
     const modeEl = document.getElementById('mode-badge');
 
     if (data.trading_paused) {
-        statusText.textContent = 'PAUSED';
+        statusText.textContent = 'Paused';
         statusText.style.color = 'var(--accent-amber)';
         statusDot.classList.add('pulse-dot-amber');
     } else {
-        statusText.textContent = 'SYSTEM ONLINE';
+        statusText.textContent = 'System Online';
         statusText.style.color = 'var(--accent-green)';
         statusDot.classList.remove('pulse-dot-amber');
     }
 
     const mode = data.trading_mode.toUpperCase();
     if (mode === 'LIVE') {
-        modeEl.textContent = '◉ LIVE TRADING';
+        modeEl.textContent = 'Live Trading';
         modeEl.style.color = 'var(--accent-red)';
     } else if (mode === 'DRY_RUN') {
-        modeEl.textContent = '◎ DRY RUN';
+        modeEl.textContent = 'Dry Run';
         modeEl.style.color = 'var(--accent-amber)';
     } else {
-        modeEl.textContent = '○ ALERT ONLY';
+        modeEl.textContent = 'Alert Only';
         modeEl.style.color = 'var(--text-dim)';
     }
 
-    // Build overview HTML
     const el = document.getElementById('tab-overview');
     el.innerHTML = `
-        <!-- Row 1: Key Stats -->
         <div class="row g-3 mb-3">
-            <div class="col-md-3 col-6">
-                <div class="terminal-card">
-                    <div class="card-titlebar"><span class="title-text">POSITIONS</span></div>
+            <div class="col-md-3 col-6 fade-up">
+                <div class="rome-card">
+                    <div class="card-header-rome"><span class="title-text">Positions</span></div>
                     <div class="card-body-inner text-center">
                         <div class="stat-value" id="stat-positions">${data.open_positions}</div>
-                        <div class="stat-label">OPEN</div>
+                        <div class="stat-label">Open</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 col-6">
-                <div class="terminal-card">
-                    <div class="card-titlebar"><span class="title-text">INVESTED</span></div>
+            <div class="col-md-3 col-6 fade-up">
+                <div class="rome-card">
+                    <div class="card-header-rome"><span class="title-text">Invested</span></div>
                     <div class="card-body-inner text-center">
                         <div class="stat-value" id="stat-invested">${fmt(data.total_invested, 4)}</div>
-                        <div class="stat-label">SOL DEPLOYED</div>
+                        <div class="stat-label">SOL Deployed</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 col-6">
-                <div class="terminal-card">
-                    <div class="card-titlebar"><span class="title-text">UNREALIZED</span></div>
+            <div class="col-md-3 col-6 fade-up">
+                <div class="rome-card">
+                    <div class="card-header-rome"><span class="title-text">Unrealized</span></div>
                     <div class="card-body-inner text-center">
                         <div class="stat-value">${fmtPnl(data.unrealized_pnl)}</div>
-                        <div class="stat-label">OPEN PNL</div>
+                        <div class="stat-label">Open PnL</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 col-6">
-                <div class="terminal-card">
-                    <div class="card-titlebar"><span class="title-text">ALL TIME</span></div>
+            <div class="col-md-3 col-6 fade-up">
+                <div class="rome-card">
+                    <div class="card-header-rome"><span class="title-text">All Time</span></div>
                     <div class="card-body-inner text-center">
                         <div class="stat-value">${fmtPnl(data.all_time_pnl)}</div>
-                        <div class="stat-label">REALIZED PNL</div>
+                        <div class="stat-label">Realized PnL</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Row 2: Secondary Stats -->
         <div class="row g-3 mb-3">
-            <div class="col-md-3 col-6">
-                <div class="terminal-card">
-                    <div class="card-titlebar"><span class="title-text">WALLETS</span></div>
+            <div class="col-md-3 col-6 fade-up">
+                <div class="rome-card">
+                    <div class="card-header-rome"><span class="title-text">Wallets</span></div>
                     <div class="card-body-inner text-center">
-                        <div class="stat-value" style="color:var(--text-secondary); text-shadow:none;">${data.monitored_wallets}</div>
-                        <div class="stat-label">MONITORED</div>
+                        <div class="stat-value" style="color:var(--text-secondary);">${data.monitored_wallets}</div>
+                        <div class="stat-label">Monitored</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 col-6">
-                <div class="terminal-card">
-                    <div class="card-titlebar"><span class="title-text">SCORED</span></div>
+            <div class="col-md-3 col-6 fade-up">
+                <div class="rome-card">
+                    <div class="card-header-rome"><span class="title-text">Scored</span></div>
                     <div class="card-body-inner text-center">
-                        <div class="stat-value" style="color:var(--text-secondary); text-shadow:none;">${data.total_wallets}</div>
-                        <div class="stat-label">WALLETS ANALYZED</div>
+                        <div class="stat-value" style="color:var(--text-secondary);">${data.total_wallets}</div>
+                        <div class="stat-label">Wallets Analyzed</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 col-6">
-                <div class="terminal-card">
-                    <div class="card-titlebar"><span class="title-text">DISCOVERY</span></div>
+            <div class="col-md-3 col-6 fade-up">
+                <div class="rome-card">
+                    <div class="card-header-rome"><span class="title-text">Discovery</span></div>
                     <div class="card-body-inner text-center">
-                        <div class="stat-value" style="color:var(--text-secondary); text-shadow:none;">${data.total_tokens}</div>
-                        <div class="stat-label">TOKENS FOUND</div>
+                        <div class="stat-value" style="color:var(--text-secondary);">${data.total_tokens}</div>
+                        <div class="stat-label">Tokens Found</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 col-6">
-                <div class="terminal-card">
-                    <div class="card-titlebar"><span class="title-text">TODAY</span></div>
+            <div class="col-md-3 col-6 fade-up">
+                <div class="rome-card">
+                    <div class="card-header-rome"><span class="title-text">Today</span></div>
                     <div class="card-body-inner text-center">
                         <div class="stat-value">${fmtPnl(data.today_pnl)}</div>
-                        <div class="stat-label">${data.today_buys} BUYS / ${data.today_sells} SELLS</div>
+                        <div class="stat-label">${data.today_buys} Buys / ${data.today_sells} Sells</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- PnL Chart -->
-        <div class="terminal-card mb-3">
-            <div class="card-titlebar"><span class="title-text">PNL_CHART</span></div>
+        <div class="rome-card mb-3 fade-up">
+            <div class="card-header-rome"><span class="title-text">PnL Chart</span></div>
             <div class="chart-container">
                 <canvas id="pnlChart"></canvas>
             </div>
         </div>
 
-        <!-- Charts Row: Score Dist + Win/Loss + Portfolio -->
         <div class="row g-3 mb-3">
-            <div class="col-md-4">
-                <div class="terminal-card chart-small">
-                    <div class="card-titlebar"><span class="title-text">WALLET_SCORES</span></div>
+            <div class="col-md-4 fade-up">
+                <div class="rome-card chart-small">
+                    <div class="card-header-rome"><span class="title-text">Wallet Scores</span></div>
                     <div class="chart-container">
                         <canvas id="walletScoreChart"></canvas>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="terminal-card chart-small">
-                    <div class="card-titlebar"><span class="title-text">WIN_LOSS</span></div>
+            <div class="col-md-4 fade-up">
+                <div class="rome-card chart-small">
+                    <div class="card-header-rome"><span class="title-text">Win / Loss</span></div>
                     <div class="chart-container">
                         <canvas id="winLossChart"></canvas>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="terminal-card chart-small">
-                    <div class="card-titlebar"><span class="title-text">PORTFOLIO</span></div>
+            <div class="col-md-4 fade-up">
+                <div class="rome-card chart-small">
+                    <div class="card-header-rome"><span class="title-text">Portfolio</span></div>
                     <div class="chart-container">
                         <canvas id="portfolioChart"></canvas>
                     </div>
@@ -1340,19 +1692,17 @@ async function loadOverview() {
             </div>
         </div>
 
-        <!-- Trade Activity Chart -->
-        <div class="terminal-card mb-3">
-            <div class="card-titlebar"><span class="title-text">TRADE_ACTIVITY</span></div>
+        <div class="rome-card mb-3 fade-up">
+            <div class="card-header-rome"><span class="title-text">Trade Activity</span></div>
             <div class="chart-container">
                 <canvas id="tradeActivityChart"></canvas>
             </div>
         </div>
 
-        <!-- Recent Trades -->
-        <div class="terminal-card">
-            <div class="card-titlebar">
-                <span class="title-text">RECENT_TRADES</span>
-                <span style="font-size:10px;">${data.recent_trades.length} ENTRIES</span>
+        <div class="rome-card fade-up">
+            <div class="card-header-rome">
+                <span class="title-text">Recent Trades</span>
+                <span class="count-text">${data.recent_trades.length} entries</span>
             </div>
             <div class="card-body-inner">
                 ${data.recent_trades.length > 0 ? `
@@ -1364,7 +1714,7 @@ async function loadOverview() {
                         <tbody>
                             ${data.recent_trades.map(t => `
                             <tr onclick="showTokenDetail('${t.token_mint}')">
-                                <td style="white-space:nowrap">${t.created_at || '—'}</td>
+                                <td style="white-space:nowrap; color:var(--text-dim)">${t.created_at || '\u2014'}</td>
                                 <td>${t.token_symbol || shortAddr(t.token_mint)}</td>
                                 <td><span class="badge badge-${t.side}">${t.side.toUpperCase()}</span></td>
                                 <td>${fmt(t.amount_sol, 6)} SOL</td>
@@ -1372,12 +1722,11 @@ async function loadOverview() {
                             </tr>`).join('')}
                         </tbody>
                     </table>
-                </div>` : '<div style="color:var(--text-dim); text-align:center; padding:20px;">AWAITING TRADE DATA . . .<span class="blink-cursor"></span></div>'}
+                </div>` : '<div class="loading-text">Awaiting trade data...</div>'}
             </div>
         </div>
     `;
 
-    // Load all charts
     loadPnlChart();
     loadWalletScoreChart();
     if (tradeStats) {
@@ -1385,8 +1734,6 @@ async function loadOverview() {
         loadTradeActivityChart(tradeStats);
         loadPortfolioChart(tradeStats);
     }
-
-    // Update ticker
     updateTicker(data.recent_trades);
     updateRefreshTimer();
 }
@@ -1401,7 +1748,7 @@ async function loadWallets() {
 
     if (data.wallets.length === 0) {
         el.innerHTML = `<div class="empty-state">
-            <h5>NO WALLETS SCORED<span class="blink-cursor"></span></h5>
+            <h5>No Wallets Scored</h5>
             <p style="margin-top:12px;">Run discovery + analysis first:</p>
             <code>python main.py --discover</code><br><br>
             <code>python main.py --analyze</code>
@@ -1410,10 +1757,10 @@ async function loadWallets() {
     }
 
     el.innerHTML = `
-        <div class="terminal-card">
-            <div class="card-titlebar">
-                <span class="title-text">SMART_WALLET_LEADERBOARD</span>
-                <span style="font-size:10px;">${data.wallets.length} WALLETS</span>
+        <div class="rome-card fade-up">
+            <div class="card-header-rome">
+                <span class="title-text">Smart Wallet Leaderboard</span>
+                <span class="count-text">${data.wallets.length} wallets</span>
             </div>
             <div class="card-body-inner">
                 <div class="table-responsive">
@@ -1430,13 +1777,13 @@ async function loadWallets() {
                                     ${w.is_monitored ? '<span class="pulse-dot"></span>' : ''}${shortAddr(w.address)}
                                 </td>
                                 <td>
-                                    <strong style="color:${scoreColor(w.total_score)}; text-shadow:0 0 6px ${scoreColor(w.total_score)}40;">${w.total_score.toFixed(0)}</strong>
-                                    <div class="score-bar mt-1"><div class="score-fill" style="width:${w.total_score}%; background:${scoreColor(w.total_score)}; color:${scoreColor(w.total_score)};"></div></div>
+                                    <strong style="color:${scoreColor(w.total_score)}">${w.total_score.toFixed(0)}</strong>
+                                    <div class="score-bar mt-1"><div class="score-fill" style="width:${w.total_score}%; background:${scoreColor(w.total_score)};"></div></div>
                                 </td>
                                 <td>${fmtPnl(w.total_pnl_sol)}</td>
                                 <td>${w.win_rate.toFixed(0)}%</td>
                                 <td>${w.total_trades}</td>
-                                <td style="color:var(--text-dim)">Rank ${w.avg_entry_rank || '—'}</td>
+                                <td style="color:var(--text-dim)">Rank ${w.avg_entry_rank || '\u2014'}</td>
                                 <td>
                                     ${w.is_monitored ? '<span class="badge badge-monitored">MON</span>' : ''}
                                     ${w.is_flagged ? '<span class="badge badge-flagged">' + (w.flag_reason || 'FLAG') + '</span>' : ''}
@@ -1461,7 +1808,7 @@ async function loadTokens() {
 
     if (data.tokens.length === 0) {
         el.innerHTML = `<div class="empty-state">
-            <h5>NO TOKENS DISCOVERED<span class="blink-cursor"></span></h5>
+            <h5>No Tokens Discovered</h5>
             <p style="margin-top:12px;">Run discovery:</p>
             <code>python main.py --discover</code>
         </div>`;
@@ -1469,10 +1816,10 @@ async function loadTokens() {
     }
 
     el.innerHTML = `
-        <div class="terminal-card">
-            <div class="card-titlebar">
-                <span class="title-text">DISCOVERED_TOKENS</span>
-                <span style="font-size:10px;">${data.tokens.length} TOKENS</span>
+        <div class="rome-card fade-up">
+            <div class="card-header-rome">
+                <span class="title-text">Discovered Tokens</span>
+                <span class="count-text">${data.tokens.length} tokens</span>
             </div>
             <div class="card-body-inner">
                 <div class="table-responsive">
@@ -1486,19 +1833,19 @@ async function loadTokens() {
                             <tr onclick="showTokenDetail('${t.mint_address}')">
                                 <td style="color:var(--text-dim)">${i + 1}</td>
                                 <td>
-                                    <strong style="color:var(--accent-green)">${t.symbol || '—'}</strong>
+                                    <strong style="color:var(--text-primary)">${t.symbol || '\u2014'}</strong>
                                     <br><span style="color:var(--text-dim); font-size:10px;">${t.name || ''}</span>
                                 </td>
                                 <td>
-                                    <strong style="color:var(--accent-green); text-shadow:var(--glow-green);">
-                                        ${t.price_multiplier ? t.price_multiplier.toFixed(1) + 'x' : '—'}
+                                    <strong style="color:var(--accent-gold);">
+                                        ${t.price_multiplier ? t.price_multiplier.toFixed(1) + 'x' : '\u2014'}
                                     </strong>
                                 </td>
                                 <td>${fmtUsd(t.market_cap_usd)}</td>
                                 <td>${fmtUsd(t.liquidity_usd)}</td>
                                 <td>${fmtUsd(t.volume_24h_usd)}</td>
-                                <td>${t.holder_count || '—'}</td>
-                                <td style="color:var(--accent-amber)">${t.data_source || '—'}</td>
+                                <td>${t.holder_count || '\u2014'}</td>
+                                <td style="color:var(--accent-amber)">${t.data_source || '\u2014'}</td>
                             </tr>`).join('')}
                         </tbody>
                     </table>
@@ -1519,31 +1866,31 @@ async function loadTrades() {
 
     if (data.trades.length === 0) {
         el.innerHTML = `<div class="empty-state">
-            <h5>NO TRADES EXECUTED<span class="blink-cursor"></span></h5>
-            <p style="margin-top:12px;">Trades will appear once the bot starts copying wallets.</p>
+            <h5>No Trades Executed</h5>
+            <p style="margin-top:12px;">Trades will appear once the agent starts executing.</p>
         </div>`;
         return;
     }
 
     el.innerHTML = `
-        <div class="terminal-card">
-            <div class="card-titlebar">
-                <span class="title-text">TRADE_HISTORY</span>
-                <span style="font-size:10px;">${data.trades.length} RECORDS</span>
+        <div class="rome-card fade-up">
+            <div class="card-header-rome">
+                <span class="title-text">Trade History</span>
+                <span class="count-text">${data.trades.length} records</span>
             </div>
             <div class="card-body-inner">
                 <div class="table-responsive">
                     <table class="table table-sm table-hover mb-0">
                         <thead><tr>
                             <th>Time</th><th>Token</th><th>Side</th><th>SOL</th>
-                            <th>Price</th><th>Copied From</th><th>Reason</th><th>Status</th>
+                            <th>Price</th><th>Triggered By</th><th>Reason</th><th>Status</th>
                         </tr></thead>
                         <tbody>
                             ${data.trades.map(t => `
                             <tr>
-                                <td style="white-space:nowrap; color:var(--text-dim)">${t.created_at || '—'}</td>
+                                <td style="white-space:nowrap; color:var(--text-dim)">${t.created_at || '\u2014'}</td>
                                 <td>
-                                    <span style="cursor:pointer; color:var(--accent-green);" onclick="showTokenDetail('${t.token_mint}')">
+                                    <span style="cursor:pointer; color:var(--accent-gold);" onclick="showTokenDetail('${t.token_mint}')">
                                         ${t.token_symbol || shortAddr(t.token_mint)}
                                     </span>
                                 </td>
@@ -1555,7 +1902,7 @@ async function loadTrades() {
                                         ${shortAddr(t.triggered_by_wallet)}
                                     </span>
                                 </td>
-                                <td style="color:var(--text-dim)">${t.sell_reason || '—'}</td>
+                                <td style="color:var(--text-dim)">${t.sell_reason || '\u2014'}</td>
                                 <td>${t.status}</td>
                             </tr>`).join('')}
                         </tbody>
@@ -1577,8 +1924,8 @@ async function loadPositions() {
 
     if (data.positions.length === 0) {
         el.innerHTML = `<div class="empty-state">
-            <h5>NO POSITIONS<span class="blink-cursor"></span></h5>
-            <p style="margin-top:12px;">Positions will appear once the bot executes trades.</p>
+            <h5>No Positions</h5>
+            <p style="margin-top:12px;">Positions will appear once the agent executes trades.</p>
         </div>`;
         return;
     }
@@ -1587,10 +1934,10 @@ async function loadPositions() {
     const closed = data.positions.filter(p => p.status === 'closed');
 
     el.innerHTML = `
-        <div class="terminal-card mb-3">
-            <div class="card-titlebar">
-                <span class="title-text">OPEN_POSITIONS</span>
-                <span style="font-size:10px;">${open.length} ACTIVE</span>
+        <div class="rome-card mb-3 fade-up">
+            <div class="card-header-rome">
+                <span class="title-text">Open Positions</span>
+                <span class="count-text">${open.length} active</span>
             </div>
             <div class="card-body-inner">
                 ${open.length > 0 ? `
@@ -1598,13 +1945,13 @@ async function loadPositions() {
                     <table class="table table-sm table-hover mb-0">
                         <thead><tr>
                             <th>Token</th><th>Invested</th><th>Entry</th><th>Current</th>
-                            <th>Multiple</th><th>Unrealized PnL</th><th>Copied From</th>
+                            <th>Multiple</th><th>Unrealized PnL</th><th>Triggered By</th>
                         </tr></thead>
                         <tbody>
                             ${open.map(p => `
                             <tr>
                                 <td>
-                                    <span style="cursor:pointer; color:var(--accent-green);" onclick="showTokenDetail('${p.token_mint}')">
+                                    <span style="cursor:pointer; color:var(--accent-gold);" onclick="showTokenDetail('${p.token_mint}')">
                                         <strong>${p.token_symbol || shortAddr(p.token_mint)}</strong>
                                     </span>
                                 </td>
@@ -1612,7 +1959,7 @@ async function loadPositions() {
                                 <td>${fmtUsd(p.entry_price_usd)}</td>
                                 <td>${fmtUsd(p.current_price_usd)}</td>
                                 <td>
-                                    ${p.multiplier ? `<strong style="color:${p.multiplier >= 1 ? 'var(--accent-green)' : 'var(--accent-red)'}; text-shadow:${p.multiplier >= 1 ? 'var(--glow-green)' : 'var(--glow-red)'};">${p.multiplier.toFixed(2)}x</strong>` : '—'}
+                                    ${p.multiplier ? `<strong style="color:${p.multiplier >= 1 ? 'var(--accent-green)' : 'var(--accent-red)'};">${p.multiplier.toFixed(2)}x</strong>` : '\u2014'}
                                 </td>
                                 <td>${fmtPnl(p.unrealized_pnl_sol)}</td>
                                 <td>
@@ -1623,14 +1970,14 @@ async function loadPositions() {
                             </tr>`).join('')}
                         </tbody>
                     </table>
-                </div>` : '<div style="color:var(--text-dim); text-align:center; padding:20px;">NO OPEN POSITIONS</div>'}
+                </div>` : '<div style="color:var(--text-dim); text-align:center; padding:20px; font-style:italic;">No open positions</div>'}
             </div>
         </div>
 
-        <div class="terminal-card">
-            <div class="card-titlebar">
-                <span class="title-text">CLOSED_POSITIONS</span>
-                <span style="font-size:10px;">${closed.length} RECORDS</span>
+        <div class="rome-card fade-up">
+            <div class="card-header-rome">
+                <span class="title-text">Closed Positions</span>
+                <span class="count-text">${closed.length} records</span>
             </div>
             <div class="card-body-inner">
                 ${closed.length > 0 ? `
@@ -1650,13 +1997,13 @@ async function loadPositions() {
                                 </td>
                                 <td>${fmt(p.amount_sol_invested, 4)} SOL</td>
                                 <td>${fmtPnl(p.realized_pnl_sol)}</td>
-                                <td style="color:var(--text-dim)">${p.close_reason || '—'}</td>
-                                <td style="color:var(--text-dim); white-space:nowrap;">${p.opened_at || '—'}</td>
-                                <td style="color:var(--text-dim); white-space:nowrap;">${p.closed_at || '—'}</td>
+                                <td style="color:var(--text-dim)">${p.close_reason || '\u2014'}</td>
+                                <td style="color:var(--text-dim); white-space:nowrap;">${p.opened_at || '\u2014'}</td>
+                                <td style="color:var(--text-dim); white-space:nowrap;">${p.closed_at || '\u2014'}</td>
                             </tr>`).join('')}
                         </tbody>
                     </table>
-                </div>` : '<div style="color:var(--text-dim); text-align:center; padding:20px;">NO CLOSED POSITIONS</div>'}
+                </div>` : '<div style="color:var(--text-dim); text-align:center; padding:20px; font-style:italic;">No closed positions</div>'}
             </div>
         </div>
     `;
@@ -1672,50 +2019,48 @@ async function loadClusters() {
 
     const el = document.getElementById('tab-clusters');
 
-    // Summary stats
     let html = `
-        <div class="row g-3 mb-4" style="margin-top:12px;">
-            <div class="col-md-3">
-                <div class="terminal-window">
-                    <div class="card-titlebar">[CLUSTER_STATS]</div>
-                    <div class="card-body-inner" style="text-align:center; padding:20px;">
-                        <div style="font-size:2rem; color:var(--accent-green); text-shadow:var(--glow-green);">${data.total_clusters}</div>
-                        <div class="stat-label">CLUSTERS FOUND</div>
+        <div class="row g-3 mb-4" style="margin-top:4px;">
+            <div class="col-md-3 fade-up">
+                <div class="rome-card">
+                    <div class="card-header-rome"><span class="title-text">Clusters</span></div>
+                    <div class="card-body-inner text-center" style="padding:20px;">
+                        <div class="stat-value" style="color:var(--accent-gold);">${data.total_clusters}</div>
+                        <div class="stat-label">Clusters Found</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="terminal-window">
-                    <div class="card-titlebar">[SIDE_WALLETS]</div>
-                    <div class="card-body-inner" style="text-align:center; padding:20px;">
-                        <div style="font-size:2rem; color:var(--accent-amber); text-shadow:0 0 10px rgba(255,176,0,0.3);">${data.total_side_wallets}</div>
-                        <div class="stat-label">SIDE WALLETS IDENTIFIED</div>
+            <div class="col-md-3 fade-up">
+                <div class="rome-card">
+                    <div class="card-header-rome"><span class="title-text">Side Wallets</span></div>
+                    <div class="card-body-inner text-center" style="padding:20px;">
+                        <div class="stat-value" style="color:var(--accent-amber);">${data.total_side_wallets}</div>
+                        <div class="stat-label">Identified</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="terminal-window">
-                    <div class="card-titlebar">[INFO]</div>
-                    <div class="card-body-inner" style="padding:16px; font-size:12px; color:var(--text-dim); line-height:1.7;">
+            <div class="col-md-6 fade-up">
+                <div class="rome-card">
+                    <div class="card-header-rome"><span class="title-text">About Clusters</span></div>
+                    <div class="card-body-inner" style="padding:16px; font-size:12px; color:var(--text-dim); line-height:1.8;">
                         Clusters are groups of wallets controlled by the same operator.<br>
-                        <span style="color:var(--accent-amber);">Side wallets</span> buy tokens BEFORE the public wallet,
+                        <span style="color:var(--accent-gold); font-weight:500;">Side wallets</span> buy tokens before the public wallet,
                         giving us an early entry signal.<br>
-                        Run <span style="color:var(--accent-green);">python main.py --clusters</span> to detect new clusters.
+                        Run <code style="color:var(--accent-gold); background:var(--bg-secondary); padding:2px 6px; border-radius:3px;">python main.py --clusters</code> to detect new clusters.
                     </div>
                 </div>
             </div>
         </div>
     `;
 
-    // Cluster cards
     if (data.clusters.length === 0) {
         html += `
-            <div class="terminal-window">
-                <div class="card-titlebar">[NO_CLUSTERS]</div>
-                <div class="card-body-inner" style="text-align:center; padding:40px; color:var(--text-dim);">
-                    <div style="font-size:14px;">NO CLUSTERS DETECTED YET</div>
-                    <div style="margin-top:8px; font-size:11px;">Run --analyze then --clusters to discover wallet groups</div>
-                    <div class="blinking-cursor" style="margin-top:12px;">_</div>
+            <div class="rome-card fade-up">
+                <div class="card-header-rome"><span class="title-text">No Clusters Yet</span></div>
+                <div class="card-body-inner" style="text-align:center; padding:40px;">
+                    <div style="font-family:var(--font-serif); font-size:16px; font-style:italic; color:var(--text-dim);">
+                        Run --analyze then --clusters to discover wallet groups
+                    </div>
                 </div>
             </div>
         `;
@@ -1723,42 +2068,45 @@ async function loadClusters() {
         data.clusters.forEach((c, idx) => {
             const members = c.members || [];
             const sideWallets = members.filter(m => m.is_side_wallet);
-            const leadTime = c.avg_lead_time_seconds ? (c.avg_lead_time_seconds / 60).toFixed(1) + ' min' : '—';
+            const leadTime = c.avg_lead_time_seconds ? (c.avg_lead_time_seconds / 60).toFixed(1) + ' min' : '\u2014';
 
             html += `
-                <div class="terminal-window mb-3">
-                    <div class="card-titlebar">
-                        [CLUSTER_${idx + 1}] &nbsp; SEED: ${shortAddr(c.seed_wallet)}
-                        &nbsp;&nbsp; SCORE: <span style="color:${scoreColor(c.seed_score || 0)}">${c.seed_score ? c.seed_score.toFixed(0) : '—'}</span>
-                        &nbsp;&nbsp; MEMBERS: ${c.total_members}
-                        &nbsp;&nbsp; LEAD: <span style="color:var(--accent-amber)">${leadTime}</span>
+                <div class="rome-card mb-3 fade-up">
+                    <div class="card-header-rome">
+                        <span class="title-text">Cluster ${idx + 1}</span>
+                        <span class="count-text">
+                            Seed: ${shortAddr(c.seed_wallet)} &nbsp;\u2022&nbsp;
+                            Score: <span style="color:${scoreColor(c.seed_score || 0)}">${c.seed_score ? c.seed_score.toFixed(0) : '\u2014'}</span> &nbsp;\u2022&nbsp;
+                            Members: ${c.total_members} &nbsp;\u2022&nbsp;
+                            Lead: <span style="color:var(--accent-gold)">${leadTime}</span>
+                        </span>
                     </div>
                     <div class="card-body-inner">
                         <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:16px;">
                             <div class="stat-mini">
-                                <div class="stat-label">SEED WALLET</div>
+                                <div class="stat-label">Seed Wallet</div>
                                 <div class="addr-copy" onclick="copyAddr('${c.seed_wallet}', event)" style="font-size:11px; cursor:pointer;">
-                                    ${shortAddr(c.seed_wallet)} <span style="color:var(--text-dim); font-size:8px;">[COPY]</span>
+                                    ${shortAddr(c.seed_wallet)}
                                 </div>
                             </div>
                             <div class="stat-mini">
-                                <div class="stat-label">BEST SIDE WALLET</div>
-                                <div style="font-size:11px; color:var(--accent-amber);">
-                                    ${c.best_side_wallet ? `<span class="addr-copy" onclick="copyAddr('${c.best_side_wallet}', event)" style="cursor:pointer;">${shortAddr(c.best_side_wallet)} <span style="color:var(--text-dim); font-size:8px;">[COPY]</span></span>` : '—'}
+                                <div class="stat-label">Best Side Wallet</div>
+                                <div style="font-size:11px; color:var(--accent-gold);">
+                                    ${c.best_side_wallet ? `<span class="addr-copy" onclick="copyAddr('${c.best_side_wallet}', event)" style="cursor:pointer;">${shortAddr(c.best_side_wallet)}</span>` : '\u2014'}
                                 </div>
                             </div>
                             <div class="stat-mini">
-                                <div class="stat-label">AVG LEAD TIME</div>
-                                <div style="color:var(--accent-green); text-shadow:var(--glow-green);">${leadTime}</div>
+                                <div class="stat-label">Avg Lead Time</div>
+                                <div style="color:var(--accent-green); font-weight:500;">${leadTime}</div>
                             </div>
                             <div class="stat-mini">
-                                <div class="stat-label">SIDE WALLETS</div>
-                                <div style="color:var(--accent-amber);">${sideWallets.length}</div>
+                                <div class="stat-label">Side Wallets</div>
+                                <div style="color:var(--accent-gold); font-weight:500;">${sideWallets.length}</div>
                             </div>
                         </div>
 
                         ${members.length > 0 ? `
-                        <div style="color:var(--text-dim); font-size:10px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-dim); padding-bottom:4px;">
+                        <div style="color:var(--text-dim); font-family:var(--font-display); font-size:9px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-light); padding-bottom:4px;">
                             MEMBERS (${members.length})
                         </div>
                         <div class="table-responsive">
@@ -1770,9 +2118,9 @@ async function loadClusters() {
                                     ${members.map(m => {
                                         const conf = (m.confidence * 100).toFixed(0);
                                         const confColor = m.confidence >= 0.7 ? 'var(--accent-green)' : m.confidence >= 0.4 ? 'var(--accent-amber)' : 'var(--text-dim)';
-                                        const mLead = m.avg_lead_time_seconds ? (m.avg_lead_time_seconds / 60).toFixed(1) + 'm' : '—';
+                                        const mLead = m.avg_lead_time_seconds ? (m.avg_lead_time_seconds / 60).toFixed(1) + 'm' : '\u2014';
                                         return `
-                                        <tr style="${m.is_side_wallet ? 'background:rgba(255,176,0,0.05);' : ''}">
+                                        <tr style="${m.is_side_wallet ? 'background:rgba(184,150,12,0.04);' : ''}">
                                             <td>
                                                 <span class="addr-copy" onclick="copyAddr('${m.wallet_address}', event)" style="cursor:pointer;">
                                                     ${shortAddr(m.wallet_address)}
@@ -1781,13 +2129,13 @@ async function loadClusters() {
                                             <td style="color:var(--text-dim); font-size:11px;">${m.relationship_type}</td>
                                             <td><span style="color:${confColor}">${conf}%</span></td>
                                             <td style="color:var(--accent-green);">${mLead}</td>
-                                            <td>${m.is_side_wallet ? '<span style="color:var(--accent-amber); font-weight:700;">YES</span>' : '<span style="color:var(--text-dim);">no</span>'}</td>
+                                            <td>${m.is_side_wallet ? '<span style="color:var(--accent-gold); font-weight:600;">Yes</span>' : '<span style="color:var(--text-dim);">No</span>'}</td>
                                             <td>${m.is_monitored ? '<span class="badge badge-monitored">MON</span>' : ''}</td>
                                         </tr>`;
                                     }).join('')}
                                 </tbody>
                             </table>
-                        </div>` : '<div style="color:var(--text-dim); text-align:center; padding:12px;">NO MEMBERS</div>'}
+                        </div>` : '<div style="color:var(--text-dim); text-align:center; padding:12px; font-style:italic;">No members</div>'}
                     </div>
                 </div>
             `;
@@ -1797,6 +2145,135 @@ async function loadClusters() {
     el.innerHTML = html;
     updateRefreshTimer();
 }
+
+// =========================================================================
+// Audio System — Ambient Music + UI Sounds
+// =========================================================================
+const AudioSystem = {
+    ctx: null,
+    musicPlaying: false,
+    musicNodes: [],
+    initialized: false,
+
+    init() {
+        if (this.initialized) return;
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.initialized = true;
+    },
+
+    // Crisp subtle click — like a high-end UI tap
+    playClick() {
+        if (!this.ctx) this.init();
+        const t = this.ctx.currentTime;
+        // Noise burst for organic click
+        const bufferSize = this.ctx.sampleRate * 0.04;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.1));
+        }
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 3000;
+        filter.Q.value = 2;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.06, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start(t);
+        noise.stop(t + 0.04);
+    },
+
+    // Soft tonal hover — warm sine bloom
+    playHover() {
+        if (!this.ctx) this.init();
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, t);
+        osc.frequency.exponentialRampToValueAtTime(660, t + 0.1);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.008, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.12);
+    },
+
+    // Ambient music — plays audio file
+    startMusic() {
+        if (this.musicPlaying) return;
+        this.musicPlaying = true;
+
+        if (!this.audioEl) {
+            this.audioEl = new Audio('https://mozaic.finance/assets/audio/songs/gloomy.mp3');
+            this.audioEl.loop = true;
+            this.audioEl.volume = 0.3;
+        }
+        this.audioEl.play().catch(() => {});
+    },
+
+    stopMusic() {
+        this.musicPlaying = false;
+        if (this.audioEl) {
+            this.audioEl.pause();
+        }
+    }
+};
+
+function toggleMusic() {
+    AudioSystem.init();
+    if (AudioSystem.musicPlaying) {
+        AudioSystem.stopMusic();
+        document.getElementById('musicBars').classList.remove('playing');
+    } else {
+        AudioSystem.startMusic();
+        document.getElementById('musicBars').classList.add('playing');
+    }
+}
+
+// Click sounds on interactive elements
+document.addEventListener('click', (e) => {
+    const target = e.target.closest('a, button, .addr-copy, [onclick], .table-hover tbody tr, .nav-link');
+    if (target && AudioSystem.initialized) {
+        AudioSystem.playClick();
+    }
+});
+
+// Hover sounds on nav links
+document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('mouseenter', () => {
+        if (AudioSystem.initialized) AudioSystem.playHover();
+    });
+});
+
+// Start music on splash click
+const origEnterApp = enterApp;
+enterApp = function() {
+    AudioSystem.init();
+    AudioSystem.startMusic();
+    document.getElementById('musicBars').classList.add('playing');
+    origEnterApp();
+};
+
+// =========================================================================
+// Subtle parallax on splash
+// =========================================================================
+document.getElementById('splash')?.addEventListener('mousemove', (e) => {
+    const avatar = document.querySelector('.splash-avatar');
+    const ring = document.querySelector('.splash-ring');
+    if (!avatar || !ring) return;
+    const x = (e.clientX / window.innerWidth - 0.5) * 10;
+    const y = (e.clientY / window.innerHeight - 0.5) * 10;
+    avatar.style.transform = `translate(${x}px, ${y}px)`;
+    ring.style.transform = `translate(${x * 0.5}px, ${y * 0.5}px) rotate(${Date.now() / 100 % 360}deg)`;
+});
 
 // =========================================================================
 // Initial Load & Auto-Refresh

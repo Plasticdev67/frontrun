@@ -1,6 +1,6 @@
 """
-Solana Copy Trading Bot — Main Entry Point
-===========================================
+Rome Agent Trader — Main Entry Point
+=====================================
 This is where everything starts. Running this file:
 1. Loads your configuration from .env
 2. Validates that all required API keys are present
@@ -67,7 +67,7 @@ async def main() -> None:
     """Main async entry point."""
 
     # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Solana Copy Trading Bot")
+    parser = argparse.ArgumentParser(description="Rome Agent Trader")
     parser.add_argument("--discover", action="store_true", help="Run token discovery only")
     parser.add_argument("--analyze", action="store_true", help="Run wallet analysis only")
     parser.add_argument("--dry-run", action="store_true", help="Start in dry-run mode")
@@ -75,14 +75,6 @@ async def main() -> None:
     parser.add_argument("--dashboard", action="store_true", help="Launch web dashboard")
     parser.add_argument("--mode", choices=["live", "dry_run", "alert_only"], help="Override trading mode")
     args = parser.parse_args()
-
-    # Dashboard mode — launch web UI and exit (no trading)
-    if args.dashboard:
-        from dashboard.app import run_dashboard
-        setup_logging(log_level=settings.log_level, log_dir="logs")
-        logger.info("launching_dashboard")
-        run_dashboard()
-        return
 
     # Override trading mode if specified
     if args.dry_run:
@@ -325,5 +317,17 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    # asyncio.run() starts the async event loop and runs our main function
-    asyncio.run(main())
+    # Dashboard runs outside async loop (uvicorn manages its own)
+    import argparse as _argparse
+    _pre_parser = _argparse.ArgumentParser(add_help=False)
+    _pre_parser.add_argument("--dashboard", action="store_true")
+    _pre_args, _ = _pre_parser.parse_known_args()
+
+    if _pre_args.dashboard:
+        from dashboard.app import run_dashboard
+        setup_logging(log_level=settings.log_level, log_dir="logs")
+        logger.info("launching_dashboard")
+        run_dashboard()
+    else:
+        # asyncio.run() starts the async event loop and runs our main function
+        asyncio.run(main())

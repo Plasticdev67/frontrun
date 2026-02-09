@@ -116,8 +116,8 @@ class TelegramBot:
         wallets = await self.db.get_monitored_wallets()
 
         msg = (
-            "Solana Copy Trading Bot\n"
-            "=======================\n\n"
+            "Rome Agent Trader\n"
+            "==================\n\n"
             f"Mode: {mode}{paused}\n"
             f"Position size: {self.settings.default_position_size_sol} SOL\n"
             f"Open positions: {len(positions)}\n"

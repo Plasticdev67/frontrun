@@ -1,7 +1,7 @@
 """
 Web Dashboard
 =============
-A browser-based dashboard for viewing your copy trading bot's data.
+A browser-based dashboard for viewing Rome Agent Trader's data.
 
 Shows:
 - Overview: key stats, recent activity, PnL chart
@@ -34,7 +34,7 @@ logger = get_logger(__name__)
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
-app = FastAPI(title="Copy Trading Dashboard", docs_url=None, redoc_url=None)
+app = FastAPI(title="Rome Agent Trader", docs_url=None, redoc_url=None)
 
 # Database path from settings
 DB_PATH = settings.db_path

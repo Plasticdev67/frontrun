@@ -28,7 +28,7 @@ logger = get_logger(__name__)
 
 class Database:
     """
-    Async database manager for the copy trading bot.
+    Async database manager for Rome Agent Trader.
 
     Usage:
         db = Database("path/to/database.db")

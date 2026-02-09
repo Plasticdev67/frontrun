@@ -3,7 +3,7 @@ Anomaly Detector
 ================
 Flags wallets that look suspicious — bots, insiders, dev wallets, etc.
 
-We don't want to copy trade these because:
+We don't want to follow these because:
 - Dev wallets get tokens for free (their "alpha" is just insider access)
 - Sniper bots buy in the same block as liquidity — we can NEVER be that fast
 - Insider wallets might have non-public info that won't repeat

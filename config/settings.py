@@ -241,7 +241,7 @@ class Settings:
 
     # Path to the SQLite database file
     db_path: str = field(
-        default_factory=lambda: str(Path(__file__).parent.parent / "data" / "copy_trader.db")
+        default_factory=lambda: str(Path(__file__).parent.parent / "data" / "rome_agent.db")
     )
 
     # Logging level: DEBUG, INFO, WARNING, ERROR

@@ -9,7 +9,7 @@ directly affects real money. It's designed to be:
 - TRANSPARENT: Every decision is logged with full context
 - RECOVERABLE: Failed trades are handled gracefully
 
-The flow for a copy trade:
+The flow for a trade:
 1. Signal arrives from the monitor (via signal generator validation)
 2. Safety rails run pre-trade checks
 3. Calculate position size
@@ -82,7 +82,7 @@ class TradeExecutor:
     async def handle_signal(self, signal: dict) -> dict | None:
         """
         Handle a buy signal from the wallet monitor.
-        This is the main entry point for copy trading.
+        This is the main entry point for trade execution.
 
         Returns trade data if executed, None if skipped.
         """

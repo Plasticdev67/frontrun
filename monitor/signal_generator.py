@@ -11,7 +11,7 @@ This module checks:
 2. Do we already have a position in this token?
 3. Are we within our risk limits? (max positions, daily loss)
 4. Are multiple smart wallets buying the same token? (stronger signal)
-5. Does the market cap meet our copy trading threshold?
+5. Does the market cap meet our trading threshold?
 
 Think of this as the "risk manager" that sits between detection and execution.
 The monitor says "smart wallet bought something!" and this module decides
