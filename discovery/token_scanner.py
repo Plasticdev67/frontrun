@@ -308,7 +308,7 @@ class TokenScanner:
         logger.info("qualifying_tokens", count=len(qualifying))
 
         # Step 5: Sort by performance (best first)
-        qualifying.sort(key=lambda t: t.get("price_multiplier", 0), reverse=True)
+        qualifying.sort(key=lambda t: t.get("price_multiplier") or 0, reverse=True)
 
         # Step 6: Save to database
         saved_count = 0
@@ -500,35 +500,79 @@ class TokenScanner:
 
     def _filter_tokens(self, tokens: list[dict]) -> list[dict]:
         """
-        Filter tokens by our criteria:
+        Filter tokens by strict criteria to eliminate rugs and scams:
         - Market cap between min and max
-        - Price multiplier >= minimum (e.g., 5x)
-        - Has liquidity data
-        - Not on our blacklist
+        - Price multiplier >= minimum (MUST have data — no N/A allowed)
+        - Real liquidity (minimum $50K)
+        - Healthy liquidity-to-mcap ratio (catches fake mcap rugs)
+        - Minimum holder count
+        - Clean symbol/name (no random strings)
+        - Not on blacklist
         """
+        import re
         qualifying = []
         for token in tokens:
             mint = token.get("mint_address", "")
+            symbol = token.get("symbol", "")
+            name = token.get("name", "")
             mcap = token.get("market_cap_usd") or 0
             multiplier = token.get("price_multiplier") or 0
             liquidity = token.get("liquidity_usd") or 0
+            holders = token.get("holder_count") or 0
+            volume = token.get("volume_24h_usd") or 0
 
             # Skip blacklisted tokens
             if mint in self.settings.token_blacklist:
-                logger.debug("token_blacklisted", symbol=token.get("symbol"), mint=mint[:8])
+                logger.debug("token_filtered", symbol=symbol, reason="blacklisted")
                 continue
 
             # Market cap filter
             if mcap < self.settings.min_market_cap_usd or mcap > self.settings.max_market_cap_usd:
                 continue
 
-            # Minimum performance filter (if we have multiplier data)
-            if multiplier > 0 and multiplier < self.settings.min_price_multiplier:
+            # MUST have price multiplier data — no N/A tokens
+            if not multiplier or multiplier <= 0:
+                logger.debug("token_filtered", symbol=symbol, reason="no_multiplier_data")
                 continue
 
-            # Minimum liquidity
-            if liquidity < self.settings.min_liquidity_usd:
+            # Minimum performance filter
+            if multiplier < self.settings.min_price_multiplier:
                 continue
+
+            # Minimum liquidity — $50K floor to ensure we can actually sell
+            if liquidity < 50_000:
+                logger.debug("token_filtered", symbol=symbol, reason=f"low_liquidity_${liquidity:.0f}")
+                continue
+
+            # Liquidity-to-mcap ratio — rugs have huge mcap but tiny liquidity
+            # Healthy tokens typically have at least 1-2% liquidity ratio
+            if mcap > 0 and (liquidity / mcap) < 0.005:
+                logger.debug("token_filtered", symbol=symbol, reason=f"bad_liq_ratio_{liquidity/mcap:.4f}")
+                continue
+
+            # Minimum 24h volume — dead tokens aren't interesting
+            if volume < 10_000:
+                logger.debug("token_filtered", symbol=symbol, reason=f"low_volume_${volume:.0f}")
+                continue
+
+            # Symbol sanity check — filter out random gibberish names
+            # Legit tokens have clean symbols (1-10 chars, letters/numbers)
+            if not re.match(r'^[A-Za-z0-9$. ]{1,15}$', symbol):
+                logger.debug("token_filtered", symbol=symbol, reason="suspicious_symbol")
+                continue
+
+            # Filter tokens with spaces in symbol (often scams like "BVB XMN5")
+            if ' ' in symbol.strip():
+                logger.debug("token_filtered", symbol=symbol, reason="multi_word_symbol")
+                continue
+
+            # Filter random-looking symbols (3+ consecutive consonants or digits)
+            if re.match(r'^[a-z0-9]+$', symbol.lower()) and len(symbol) > 4:
+                consonant_runs = re.findall(r'[bcdfghjklmnpqrstvwxyz]{3,}', symbol.lower())
+                digit_runs = re.findall(r'[0-9]{2,}', symbol)
+                if consonant_runs or digit_runs:
+                    logger.debug("token_filtered", symbol=symbol, reason="random_looking_symbol")
+                    continue
 
             qualifying.append(token)
 

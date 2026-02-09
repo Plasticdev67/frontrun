@@ -51,33 +51,29 @@
             overflow-x: hidden;
             margin: 0;
         }
-        /* Large faint pfp watermark background — like Mozaic's helmet */
+        /* Large faint bust outline watermark on dashboard — like Mozaic's helmet */
         body::before {
             content: '';
             position: fixed;
             top: 50%;
-            right: -5%;
-            transform: translateY(-50%);
-            width: 70vh;
-            height: 70vh;
-            background: url('https://avatars.githubusercontent.com/Plasticdev67') center/cover no-repeat;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 85vh;
+            height: 85vh;
+            background: url('/static/images/bust-outline.png') center/contain no-repeat;
             opacity: 0.06;
-            filter: invert(1) grayscale(100%) contrast(0.5) brightness(1.4);
             pointer-events: none;
             z-index: 0;
         }
 
         /* ========================================
-           SPLASH SCREEN
+           SPLASH SCREEN — CRT SURVEILLANCE MONITOR
            ======================================== */
         .splash-screen {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: #f0ebe3;
-            background-image:
-                linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
-            background-size: 40px 40px;
+            background: var(--bg-primary);
+            background-image: var(--texture);
             z-index: 10000;
             display: flex;
             flex-direction: column;
@@ -85,66 +81,125 @@
             justify-content: center;
             cursor: pointer;
             transition: opacity 0.8s ease, visibility 0.8s ease;
+            overflow: hidden;
         }
         .splash-screen.hidden {
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
         }
-        .splash-compass {
+
+        /* Large bust watermark behind everything on splash */
+        .splash-bg-bust {
             position: absolute;
-            top: 24px;
-            right: 28px;
-            font-size: 20px;
-            color: #b8960c;
-            opacity: 0.6;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 75vh;
+            height: 75vh;
+            background: url('/static/images/bust-outline.png') center/contain no-repeat;
+            opacity: 0.08;
+            z-index: 1;
+            pointer-events: none;
         }
-        .splash-avatar {
-            width: 200px;
-            height: 200px;
-            border-radius: 50%;
-            border: none;
-            object-fit: cover;
-            opacity: 0;
-            animation: splashFadeIn 2s ease forwards;
-            /* Invert dark pfp to light outline sketch effect */
-            filter: invert(1) grayscale(100%) contrast(0.6) brightness(1.3);
+
+        /* CRT TV static noise — animated canvas overlay */
+        .crt-static {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 2;
+            opacity: 0.04;
             mix-blend-mode: multiply;
+            pointer-events: none;
         }
-        .splash-ring {
+
+        /* Horizontal scan lines — subtle on cream */
+        .crt-scanlines {
             position: absolute;
-            width: 260px;
-            height: 260px;
-            border-radius: 50%;
-            opacity: 0;
-            animation: splashFadeIn 2s ease 0.3s forwards, ringRotate 60s linear infinite;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 3px,
+                rgba(0, 0, 0, 0.03) 3px,
+                rgba(0, 0, 0, 0.03) 6px
+            );
+            z-index: 3;
+            pointer-events: none;
+            animation: scanlineShift 0.1s steps(2) infinite;
         }
-        /* Tick marks around ring — like Mozaic clock face */
-        .splash-ring svg {
-            width: 100%;
-            height: 100%;
+
+        /* Moving scan bar */
+        .crt-scanbar {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 6px;
+            background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.02), transparent);
+            z-index: 4;
+            pointer-events: none;
+            animation: scanbar 4s linear infinite;
         }
-        .splash-enter {
-            margin-top: 50px;
+
+        /* Subtle vignette flicker */
+        .splash-screen::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.08) 100%);
+            z-index: 5;
+            pointer-events: none;
+            animation: crtFlicker 0.15s infinite;
+        }
+
+        @keyframes scanlineShift {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(6px); }
+        }
+        @keyframes scanbar {
+            0% { top: -2%; }
+            100% { top: 102%; }
+        }
+        @keyframes crtFlicker {
+            0% { opacity: 1; }
+            50% { opacity: 0.97; }
+            100% { opacity: 1; }
+        }
+
+        /* Title text — "Rome Agent" */
+        .splash-title {
+            position: relative;
+            z-index: 6;
+            margin-top: 0;
             font-family: var(--font-display);
-            font-size: 11px;
-            letter-spacing: 6px;
-            color: #888;
+            font-size: 18px;
+            letter-spacing: 10px;
+            color: var(--accent-gold);
             text-transform: uppercase;
             opacity: 0;
-            animation: splashFadeIn 1.5s ease 1.2s forwards, splashPulse 3s ease 2.5s infinite;
+            animation: heroFadeIn 2s ease 0.5s forwards;
         }
-        @keyframes splashFadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+
+        /* "Click to enter" prompt */
+        .splash-enter {
+            position: relative;
+            z-index: 6;
+            margin-top: 12px;
+            font-family: var(--font-display);
+            font-size: 9px;
+            letter-spacing: 5px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            opacity: 0;
+            animation: heroFadeIn 1.5s ease 1.2s forwards, splashPulse 3s ease 2.5s infinite;
+        }
+
+        @keyframes heroFadeIn {
+            from { opacity: 0; transform: translateY(15px); }
             to { opacity: 1; transform: translateY(0); }
         }
         @keyframes splashPulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
-        @keyframes ringRotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            50% { opacity: 0.3; }
         }
 
         /* Compass star in corner */
@@ -710,77 +765,17 @@
      SPLASH SCREEN
      ============================================ -->
 <div class="splash-screen" id="splash" onclick="enterApp()">
-    <div class="splash-compass">&#10022;</div>
-    <div class="splash-ring">
-        <svg viewBox="0 0 260 260">
-            <circle cx="130" cy="130" r="125" fill="none" stroke="#c4b99a" stroke-width="0.5"/>
-            <!-- Tick marks like a clock/compass -->
-            <g stroke="#b0a68e" stroke-width="1">
-                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(0,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(6,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(12,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(18,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(24,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(30,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(36,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(42,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(48,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(54,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(60,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(66,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(72,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(78,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(84,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(90,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(96,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(102,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(108,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(114,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(120,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(126,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(132,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(138,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(144,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(150,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(156,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(162,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(168,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(174,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(180,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(186,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(192,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(198,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(204,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(210,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(216,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(222,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(228,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(234,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(240,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(246,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(252,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(258,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(264,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(270,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(276,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(282,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(288,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(294,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(300,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(306,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(312,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(318,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(324,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="15" transform="rotate(330,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(336,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(342,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(348,130,130)"/>
-                <line x1="130" y1="5" x2="130" y2="12" transform="rotate(354,130,130)"/>
-            </g>
-        </svg>
-    </div>
-    <img src="https://avatars.githubusercontent.com/Plasticdev67" alt="Rome" class="splash-avatar">
-    <div class="splash-enter">Enter Rome</div>
+    <!-- Large bust watermark background -->
+    <div class="splash-bg-bust"></div>
+    <!-- CRT static noise layer — rendered by JS canvas -->
+    <canvas class="crt-static" id="crtStatic"></canvas>
+    <!-- Scan lines overlay -->
+    <div class="crt-scanlines"></div>
+    <!-- Moving scan bar -->
+    <div class="crt-scanbar"></div>
+    <!-- Text -->
+    <div class="splash-title">Rome Agent</div>
+    <div class="splash-enter">Click to Enter</div>
 </div>
 
 <!-- Compass Star -->
@@ -798,7 +793,7 @@
     <div class="container-fluid px-4">
         <div class="d-flex justify-content-between align-items-center">
             <div class="header-brand">
-                <img src="https://avatars.githubusercontent.com/Plasticdev67" alt="Rome" class="brand-avatar">
+                <img src="/static/images/bust-outline.png" alt="Rome" class="brand-avatar">
                 <div>
                     <div class="brand-name">ROME AGENT TRADER</div>
                     <div class="brand-subtitle">Veni, Vidi, Traded</div>
@@ -823,8 +818,8 @@
 <div class="container-fluid px-4">
     <!-- Hero Quote -->
     <div class="hero-quote fade-up">
-        "The die is cast."
-        <span class="attr">Julius Caesar</span>
+        "Accompany me, it is time for Rome to shine."
+        <span class="attr">Romulus</span>
     </div>
 
     <!-- Navigation -->
@@ -889,10 +884,13 @@ Chart.defaults.font.size = 11;
 // Splash Screen
 // =========================================================================
 function enterApp() {
+    // Start music on the splash click itself
+    AudioSystem.init();
+    AudioSystem.startMusic();
+    document.getElementById('musicBars')?.classList.add('playing');
     document.getElementById('splash').classList.add('hidden');
 }
-// Auto-dismiss splash after 5s
-setTimeout(() => { enterApp(); }, 5000);
+// Splash only dismisses on click — no auto-enter
 
 // =========================================================================
 // Tab Navigation
@@ -2161,49 +2159,50 @@ const AudioSystem = {
         this.initialized = true;
     },
 
-    // Crisp subtle click — like a high-end UI tap
+    // Clock tick — sharp mechanical click like a clock hand advancing
     playClick() {
         if (!this.ctx) this.init();
         const t = this.ctx.currentTime;
-        // Noise burst for organic click
-        const bufferSize = this.ctx.sampleRate * 0.04;
-        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.1));
-        }
-        const noise = this.ctx.createBufferSource();
-        noise.buffer = buffer;
+        // Sharp attack oscillator — woody clock tick
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1800, t);
+        osc.frequency.exponentialRampToValueAtTime(400, t + 0.015);
+        gain.gain.setValueAtTime(0.12, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+        // Resonant body — gives it that hollow clock case sound
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'bandpass';
-        filter.frequency.value = 3000;
-        filter.Q.value = 2;
-        const gain = this.ctx.createGain();
-        gain.gain.setValueAtTime(0.06, t);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
-        noise.connect(filter);
+        filter.frequency.value = 800;
+        filter.Q.value = 8;
+        osc.connect(filter);
         filter.connect(gain);
         gain.connect(this.ctx.destination);
-        noise.start(t);
-        noise.stop(t + 0.04);
+        osc.start(t);
+        osc.stop(t + 0.07);
     },
 
-    // Soft tonal hover — warm sine bloom
+    // Clock tock — softer, lower companion to the tick (hover)
     playHover() {
         if (!this.ctx) this.init();
         const t = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, t);
-        osc.frequency.exponentialRampToValueAtTime(660, t + 0.1);
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.008, t + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-        osc.connect(gain);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1200, t);
+        osc.frequency.exponentialRampToValueAtTime(300, t + 0.012);
+        gain.gain.setValueAtTime(0.04, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 600;
+        filter.Q.value = 6;
+        osc.connect(filter);
+        filter.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(t);
-        osc.stop(t + 0.12);
+        osc.stop(t + 0.06);
     },
 
     // Ambient music — plays audio file
@@ -2253,26 +2252,72 @@ document.querySelectorAll('.nav-link').forEach(link => {
     });
 });
 
-// Start music on splash click
-const origEnterApp = enterApp;
-enterApp = function() {
-    AudioSystem.init();
-    AudioSystem.startMusic();
-    document.getElementById('musicBars').classList.add('playing');
-    origEnterApp();
-};
+// Start music on first interaction (splash page load)
+// Browsers require a user gesture before audio can play, so we listen for
+// the very first click/touch anywhere and start music immediately
+(function initMusicOnFirstInteraction() {
+    function startOnInteraction() {
+        AudioSystem.init();
+        AudioSystem.startMusic();
+        document.getElementById('musicBars')?.classList.add('playing');
+        document.removeEventListener('click', startOnInteraction);
+        document.removeEventListener('touchstart', startOnInteraction);
+    }
+    document.addEventListener('click', startOnInteraction, { once: true });
+    document.addEventListener('touchstart', startOnInteraction, { once: true });
+})();
 
 // =========================================================================
-// Subtle parallax on splash
+// CRT Static Noise — animated TV noise on canvas
+// =========================================================================
+(function initCRTStatic() {
+    const canvas = document.getElementById('crtStatic');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animId;
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    function drawStatic() {
+        const w = canvas.width, h = canvas.height;
+        const imageData = ctx.createImageData(w, h);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const v = Math.random() * 255;
+            data[i] = v;
+            data[i + 1] = v;
+            data[i + 2] = v;
+            data[i + 3] = 255;
+        }
+        ctx.putImageData(imageData, 0, 0);
+        animId = requestAnimationFrame(drawStatic);
+    }
+    drawStatic();
+
+    // Stop static animation when splash is dismissed
+    const observer = new MutationObserver(() => {
+        if (document.getElementById('splash')?.classList.contains('hidden')) {
+            cancelAnimationFrame(animId);
+            observer.disconnect();
+        }
+    });
+    observer.observe(document.getElementById('splash'), { attributes: true });
+})();
+
+// =========================================================================
+// Subtle parallax on splash bust watermark
 // =========================================================================
 document.getElementById('splash')?.addEventListener('mousemove', (e) => {
-    const avatar = document.querySelector('.splash-avatar');
-    const ring = document.querySelector('.splash-ring');
-    if (!avatar || !ring) return;
-    const x = (e.clientX / window.innerWidth - 0.5) * 10;
-    const y = (e.clientY / window.innerHeight - 0.5) * 10;
-    avatar.style.transform = `translate(${x}px, ${y}px)`;
-    ring.style.transform = `translate(${x * 0.5}px, ${y * 0.5}px) rotate(${Date.now() / 100 % 360}deg)`;
+    const bust = document.querySelector('.splash-bg-bust');
+    if (!bust) return;
+    const x = (e.clientX / window.innerWidth - 0.5) * 6;
+    const y = (e.clientY / window.innerHeight - 0.5) * 6;
+    bust.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
 });
 
 // =========================================================================
