@@ -465,6 +465,9 @@
         <li class="nav-item">
             <a class="nav-link" href="#" data-tab="positions">&gt; positions</a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-tab="clusters">&gt; clusters</a>
+        </li>
     </ul>
 
     <!-- Tab Content -->
@@ -473,6 +476,7 @@
     <div id="tab-tokens" style="display:none"></div>
     <div id="tab-trades" style="display:none"></div>
     <div id="tab-positions" style="display:none"></div>
+    <div id="tab-clusters" style="display:none"></div>
 </div>
 
 <!-- Modal Container -->
@@ -1175,6 +1179,7 @@ async function loadTab(name) {
         case 'tokens': return loadTokens();
         case 'trades': return loadTrades();
         case 'positions': return loadPositions();
+        case 'clusters': return loadClusters();
     }
 }
 
@@ -1655,6 +1660,141 @@ async function loadPositions() {
             </div>
         </div>
     `;
+    updateRefreshTimer();
+}
+
+// =========================================================================
+// CLUSTERS TAB
+// =========================================================================
+async function loadClusters() {
+    const data = await fetchApi('/api/clusters');
+    if (!data) return;
+
+    const el = document.getElementById('tab-clusters');
+
+    // Summary stats
+    let html = `
+        <div class="row g-3 mb-4" style="margin-top:12px;">
+            <div class="col-md-3">
+                <div class="terminal-window">
+                    <div class="card-titlebar">[CLUSTER_STATS]</div>
+                    <div class="card-body-inner" style="text-align:center; padding:20px;">
+                        <div style="font-size:2rem; color:var(--accent-green); text-shadow:var(--glow-green);">${data.total_clusters}</div>
+                        <div class="stat-label">CLUSTERS FOUND</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="terminal-window">
+                    <div class="card-titlebar">[SIDE_WALLETS]</div>
+                    <div class="card-body-inner" style="text-align:center; padding:20px;">
+                        <div style="font-size:2rem; color:var(--accent-amber); text-shadow:0 0 10px rgba(255,176,0,0.3);">${data.total_side_wallets}</div>
+                        <div class="stat-label">SIDE WALLETS IDENTIFIED</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="terminal-window">
+                    <div class="card-titlebar">[INFO]</div>
+                    <div class="card-body-inner" style="padding:16px; font-size:12px; color:var(--text-dim); line-height:1.7;">
+                        Clusters are groups of wallets controlled by the same operator.<br>
+                        <span style="color:var(--accent-amber);">Side wallets</span> buy tokens BEFORE the public wallet,
+                        giving us an early entry signal.<br>
+                        Run <span style="color:var(--accent-green);">python main.py --clusters</span> to detect new clusters.
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Cluster cards
+    if (data.clusters.length === 0) {
+        html += `
+            <div class="terminal-window">
+                <div class="card-titlebar">[NO_CLUSTERS]</div>
+                <div class="card-body-inner" style="text-align:center; padding:40px; color:var(--text-dim);">
+                    <div style="font-size:14px;">NO CLUSTERS DETECTED YET</div>
+                    <div style="margin-top:8px; font-size:11px;">Run --analyze then --clusters to discover wallet groups</div>
+                    <div class="blinking-cursor" style="margin-top:12px;">_</div>
+                </div>
+            </div>
+        `;
+    } else {
+        data.clusters.forEach((c, idx) => {
+            const members = c.members || [];
+            const sideWallets = members.filter(m => m.is_side_wallet);
+            const leadTime = c.avg_lead_time_seconds ? (c.avg_lead_time_seconds / 60).toFixed(1) + ' min' : '—';
+
+            html += `
+                <div class="terminal-window mb-3">
+                    <div class="card-titlebar">
+                        [CLUSTER_${idx + 1}] &nbsp; SEED: ${shortAddr(c.seed_wallet)}
+                        &nbsp;&nbsp; SCORE: <span style="color:${scoreColor(c.seed_score || 0)}">${c.seed_score ? c.seed_score.toFixed(0) : '—'}</span>
+                        &nbsp;&nbsp; MEMBERS: ${c.total_members}
+                        &nbsp;&nbsp; LEAD: <span style="color:var(--accent-amber)">${leadTime}</span>
+                    </div>
+                    <div class="card-body-inner">
+                        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:16px;">
+                            <div class="stat-mini">
+                                <div class="stat-label">SEED WALLET</div>
+                                <div class="addr-copy" onclick="copyAddr('${c.seed_wallet}', event)" style="font-size:11px; cursor:pointer;">
+                                    ${shortAddr(c.seed_wallet)} <span style="color:var(--text-dim); font-size:8px;">[COPY]</span>
+                                </div>
+                            </div>
+                            <div class="stat-mini">
+                                <div class="stat-label">BEST SIDE WALLET</div>
+                                <div style="font-size:11px; color:var(--accent-amber);">
+                                    ${c.best_side_wallet ? `<span class="addr-copy" onclick="copyAddr('${c.best_side_wallet}', event)" style="cursor:pointer;">${shortAddr(c.best_side_wallet)} <span style="color:var(--text-dim); font-size:8px;">[COPY]</span></span>` : '—'}
+                                </div>
+                            </div>
+                            <div class="stat-mini">
+                                <div class="stat-label">AVG LEAD TIME</div>
+                                <div style="color:var(--accent-green); text-shadow:var(--glow-green);">${leadTime}</div>
+                            </div>
+                            <div class="stat-mini">
+                                <div class="stat-label">SIDE WALLETS</div>
+                                <div style="color:var(--accent-amber);">${sideWallets.length}</div>
+                            </div>
+                        </div>
+
+                        ${members.length > 0 ? `
+                        <div style="color:var(--text-dim); font-size:10px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-dim); padding-bottom:4px;">
+                            MEMBERS (${members.length})
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead><tr>
+                                    <th>Wallet</th><th>Relationship</th><th>Confidence</th><th>Lead Time</th><th>Side?</th><th>Monitored</th>
+                                </tr></thead>
+                                <tbody>
+                                    ${members.map(m => {
+                                        const conf = (m.confidence * 100).toFixed(0);
+                                        const confColor = m.confidence >= 0.7 ? 'var(--accent-green)' : m.confidence >= 0.4 ? 'var(--accent-amber)' : 'var(--text-dim)';
+                                        const mLead = m.avg_lead_time_seconds ? (m.avg_lead_time_seconds / 60).toFixed(1) + 'm' : '—';
+                                        return `
+                                        <tr style="${m.is_side_wallet ? 'background:rgba(255,176,0,0.05);' : ''}">
+                                            <td>
+                                                <span class="addr-copy" onclick="copyAddr('${m.wallet_address}', event)" style="cursor:pointer;">
+                                                    ${shortAddr(m.wallet_address)}
+                                                </span>
+                                            </td>
+                                            <td style="color:var(--text-dim); font-size:11px;">${m.relationship_type}</td>
+                                            <td><span style="color:${confColor}">${conf}%</span></td>
+                                            <td style="color:var(--accent-green);">${mLead}</td>
+                                            <td>${m.is_side_wallet ? '<span style="color:var(--accent-amber); font-weight:700;">YES</span>' : '<span style="color:var(--text-dim);">no</span>'}</td>
+                                            <td>${m.is_monitored ? '<span class="badge badge-monitored">MON</span>' : ''}</td>
+                                        </tr>`;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>` : '<div style="color:var(--text-dim); text-align:center; padding:12px;">NO MEMBERS</div>'}
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    el.innerHTML = html;
     updateRefreshTimer();
 }
 

@@ -421,6 +421,48 @@ async def api_trade_stats():
         await db.close()
 
 
+@app.get("/api/clusters")
+async def api_clusters():
+    """All wallet clusters with their members."""
+    db = await get_db()
+    try:
+        # Get all clusters
+        cursor = await db.execute(
+            """SELECT wc.*, w.total_score as seed_score
+               FROM wallet_clusters wc
+               LEFT JOIN wallets w ON wc.seed_wallet = w.address
+               ORDER BY wc.avg_lead_time_seconds DESC"""
+        )
+        clusters = [dict(r) for r in await cursor.fetchall()]
+
+        # Get members for each cluster
+        for cluster in clusters:
+            cursor = await db.execute(
+                """SELECT wcm.*, w.total_score, w.is_monitored
+                   FROM wallet_cluster_members wcm
+                   LEFT JOIN wallets w ON wcm.wallet_address = w.address
+                   WHERE wcm.cluster_id = ?
+                   ORDER BY wcm.confidence DESC""",
+                (cluster["id"],),
+            )
+            cluster["members"] = [dict(r) for r in await cursor.fetchall()]
+
+        # Summary stats
+        cursor = await db.execute(
+            "SELECT COUNT(*) as total FROM wallet_cluster_members WHERE is_side_wallet = TRUE"
+        )
+        row = await cursor.fetchone()
+        side_wallet_count = row["total"] if row else 0
+
+        return {
+            "clusters": clusters,
+            "total_clusters": len(clusters),
+            "total_side_wallets": side_wallet_count,
+        }
+    finally:
+        await db.close()
+
+
 def run_dashboard(host: str = "0.0.0.0", port: int = 8050):
     """Start the dashboard server."""
     import uvicorn
