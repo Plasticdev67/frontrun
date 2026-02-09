@@ -67,7 +67,48 @@ async def run_db_migrations():
         ("wallets", "gmgn_sell_30d", "INTEGER DEFAULT 0"),
         ("wallets", "gmgn_tags", "TEXT"),
         ("wallets", "source", "TEXT DEFAULT 'manual'"),
+        ("agent_decisions", "outcome_multiplier", "REAL"),
     ]
+    # Also create new tables if they don't exist
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS fomo_traders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            wallet_address TEXT UNIQUE NOT NULL,
+            username TEXT,
+            twitter_handle TEXT,
+            platform TEXT DEFAULT 'fomo',
+            ranking INTEGER,
+            pnl_24h_usd REAL DEFAULT 0,
+            pnl_7d_usd REAL DEFAULT 0,
+            pnl_30d_usd REAL DEFAULT 0,
+            pnl_all_time_usd REAL DEFAULT 0,
+            is_tracked BOOLEAN DEFAULT TRUE,
+            notes TEXT,
+            first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_decisions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token_mint TEXT NOT NULL,
+            token_symbol TEXT,
+            decision TEXT NOT NULL,
+            confidence REAL DEFAULT 0,
+            reasons TEXT,
+            wallets_buying INTEGER DEFAULT 0,
+            wallets_selling INTEGER DEFAULT 0,
+            avg_wallet_score REAL DEFAULT 0,
+            market_cap_usd REAL,
+            liquidity_usd REAL,
+            executed BOOLEAN DEFAULT FALSE,
+            trade_id INTEGER,
+            amount_sol REAL DEFAULT 0,
+            outcome_pnl_sol REAL,
+            outcome_multiplier REAL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     for table, column, col_type in migrations:
         try:
             await conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
@@ -830,6 +871,127 @@ async def api_journal():
             "wallet_performance": wallet_perf,
             "daily_pnl": daily_pnl,
         }
+    finally:
+        await db.close()
+
+
+@app.get("/api/fomo_traders")
+async def api_fomo_traders():
+    """FOMO leaderboard traders we're tracking."""
+    db = await get_db()
+    try:
+        # Check if fomo_traders table exists
+        cursor = await db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='fomo_traders'"
+        )
+        if not await cursor.fetchone():
+            return {"traders": [], "total": 0}
+
+        cursor = await db.execute(
+            """SELECT ft.*,
+                      w.total_score as wallet_score,
+                      w.gmgn_profit_30d_usd as gmgn_profit_30d,
+                      w.gmgn_winrate,
+                      w.gmgn_tags,
+                      w.is_monitored
+               FROM fomo_traders ft
+               LEFT JOIN wallets w ON ft.wallet_address = w.address
+               ORDER BY ft.ranking ASC"""
+        )
+        traders = []
+        for r in await cursor.fetchall():
+            d = dict(r)
+            tags_raw = d.get("gmgn_tags") or "[]"
+            try:
+                d["gmgn_tags"] = json.loads(tags_raw) if isinstance(tags_raw, str) else tags_raw
+            except (json.JSONDecodeError, TypeError):
+                d["gmgn_tags"] = []
+            traders.append(d)
+
+        return {"traders": traders, "total": len(traders)}
+    finally:
+        await db.close()
+
+
+@app.get("/api/agent")
+async def api_agent():
+    """Agent Brain: current strategy, decisions journal, learning stats."""
+    db = await get_db()
+    try:
+        result = {
+            "strategy": {},
+            "recent_decisions": [],
+            "stats": {},
+        }
+
+        # Load agent strategy from file
+        from pathlib import Path as _Path
+        strategy_path = _Path(settings.db_path).parent / "agent_strategy.json"
+        if strategy_path.exists():
+            try:
+                with open(strategy_path) as f:
+                    strategy = json.load(f)
+                stats = strategy.get("stats", {})
+                total = stats.get("wins", 0) + stats.get("losses", 0)
+                result["strategy"] = {
+                    "min_confidence": strategy.get("min_confidence", 0.6),
+                    "consensus_threshold": strategy.get("consensus_threshold", 2),
+                    "position_scale": strategy.get("position_scale", 1.0),
+                    "learning_cycles": stats.get("learning_cycles", 0),
+                    "win_rate": round(stats["wins"] / total * 100, 1) if total > 0 else 0,
+                    "wins": stats.get("wins", 0),
+                    "losses": stats.get("losses", 0),
+                    "total_pnl_sol": stats.get("total_pnl_sol", 0),
+                    "best_trade_sol": stats.get("best_trade_sol", 0),
+                    "worst_trade_sol": stats.get("worst_trade_sol", 0),
+                    "total_decisions": stats.get("total_decisions", 0),
+                    "trusted_wallets": len({
+                        k: v for k, v in strategy.get("wallet_trust", {}).items()
+                        if v != 1.0
+                    }),
+                    "blacklisted_tokens": len(strategy.get("token_blacklist", [])),
+                }
+            except Exception:
+                pass
+
+        # Check if agent_decisions table exists
+        cursor = await db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='agent_decisions'"
+        )
+        if await cursor.fetchone():
+            # Recent decisions
+            cursor = await db.execute(
+                """SELECT * FROM agent_decisions
+                   ORDER BY created_at DESC LIMIT 50"""
+            )
+            decisions = []
+            for r in await cursor.fetchall():
+                d = dict(r)
+                try:
+                    d["reasons"] = json.loads(d.get("reasons") or "[]")
+                except (json.JSONDecodeError, TypeError):
+                    d["reasons"] = []
+                decisions.append(d)
+            result["recent_decisions"] = decisions
+
+            # Decision stats
+            cursor = await db.execute(
+                """SELECT
+                       COUNT(*) as total,
+                       COALESCE(SUM(CASE WHEN decision='buy' THEN 1 ELSE 0 END), 0) as buys,
+                       COALESCE(SUM(CASE WHEN decision='skip' THEN 1 ELSE 0 END), 0) as skips,
+                       COALESCE(SUM(CASE WHEN executed=TRUE AND outcome_pnl_sol > 0 THEN 1 ELSE 0 END), 0) as wins,
+                       COALESCE(SUM(CASE WHEN executed=TRUE AND outcome_pnl_sol <= 0 THEN 1 ELSE 0 END), 0) as losses,
+                       COALESCE(AVG(CASE WHEN decision='buy' THEN confidence END), 0) as avg_confidence
+                   FROM agent_decisions"""
+            )
+            row = await cursor.fetchone()
+            if row:
+                result["stats"] = dict(row)
+
+        result["agent_enabled"] = settings.agent_enabled if hasattr(settings, 'agent_enabled') else False
+
+        return result
     finally:
         await db.close()
 

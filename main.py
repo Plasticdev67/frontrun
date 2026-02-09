@@ -78,6 +78,11 @@ async def main() -> None:
     parser.add_argument("--add-wallet", type=str, nargs="+", help="Add wallet address(es) manually")
     parser.add_argument("--source", type=str, default="manual", help="Source label for --add-wallet (fomo, gmgn, manual)")
     parser.add_argument("--wipe-wallets", action="store_true", help="Delete all wallets and start fresh")
+    parser.add_argument("--add-fomo-wallet", type=str, nargs="+", help="Add FOMO trader wallet(s) with metadata")
+    parser.add_argument("--fomo-list", action="store_true", help="Show all tracked FOMO traders")
+    parser.add_argument("--agent", action="store_true", help="Run the agent brain (autonomous mode)")
+    parser.add_argument("--agent-learn", action="store_true", help="Run the agent's learning cycle on its journal")
+    parser.add_argument("--agent-status", action="store_true", help="Show the agent's current strategy and stats")
     parser.add_argument("--yes", action="store_true", help="Skip confirmation prompts")
     args = parser.parse_args()
 
@@ -139,6 +144,139 @@ async def main() -> None:
             for table, count in counts.items():
                 print(f"  {table}: {count} rows deleted")
             print("\nDatabase is clean. Run --import-smart-money to populate with fresh data.")
+            return
+
+        elif args.add_fomo_wallet:
+            # Add FOMO trader wallet(s) — enrich via GMGN and add to both tables
+            from discovery.gmgn_client import GMGNClient
+
+            gmgn = GMGNClient(
+                cf_clearance=settings.gmgn_cf_clearance,
+                cf_bm=settings.gmgn_cf_bm,
+            )
+
+            added = 0
+            for address in args.add_fomo_wallet:
+                address = address.strip()
+                if len(address) < 30:
+                    print(f"  Skipping invalid address: {address}")
+                    continue
+
+                print(f"  Enriching {address[:8]}...{address[-4:]} via GMGN...")
+                stats = await gmgn.get_wallet_stats(address)
+
+                def _f(val, default=0.0):
+                    if val is None: return default
+                    try: return float(val)
+                    except (ValueError, TypeError): return default
+
+                profit_30d = _f(stats.get("realized_profit_30d"))
+                winrate = stats.get("winrate")
+                tags = stats.get("tags") or []
+                if isinstance(tags, str):
+                    import json as _json
+                    try: tags = _json.loads(tags)
+                    except: tags = []
+
+                # Add to fomo_traders table
+                await db.upsert_fomo_trader({
+                    "wallet_address": address,
+                    "platform": "fomo",
+                    "pnl_30d_usd": profit_30d,
+                    "is_tracked": True,
+                })
+
+                # Also add to wallets table with GMGN enrichment + auto-monitor
+                wallet_data = {
+                    "address": address,
+                    "source": "fomo",
+                    "total_score": 60,  # FOMO traders start higher — they're proven
+                    "gmgn_realized_profit_usd": _f(stats.get("realized_profit")),
+                    "gmgn_profit_30d_usd": profit_30d,
+                    "gmgn_sol_balance": _f(stats.get("sol_balance")),
+                    "gmgn_winrate": _f(winrate) if winrate is not None else None,
+                    "gmgn_buy_30d": int(_f(stats.get("buy_30d"))),
+                    "gmgn_sell_30d": int(_f(stats.get("sell_30d"))),
+                    "gmgn_tags": tags,
+                    "is_monitored": True,
+                }
+                await db.upsert_wallet(wallet_data)
+                added += 1
+
+                wr_display = f"{_f(winrate)*100:.0f}%" if winrate is not None else "—"
+                print(f"  ✓ FOMO trader added: {address[:8]}...{address[-4:]} | "
+                      f"30D: ${profit_30d:,.0f} | WR: {wr_display}")
+
+            gmgn.close()
+            print(f"\nDone. Added {added} FOMO trader(s) — all MONITORED + tracked.")
+            return
+
+        elif args.fomo_list:
+            # Show all FOMO traders
+            traders = await db.get_fomo_traders(tracked_only=False)
+            if not traders:
+                print("No FOMO traders tracked yet. Use --add-fomo-wallet to add some.")
+                return
+
+            print(f"\n{'='*70}")
+            print(f"  FOMO Traders ({len(traders)} total)")
+            print(f"{'='*70}")
+            for t in traders:
+                addr = t["wallet_address"]
+                name = t.get("username") or "—"
+                twitter = t.get("twitter_handle") or "—"
+                rank = t.get("ranking") or "—"
+                pnl_24h = t.get("pnl_24h_usd") or 0
+                tracked = "✓" if t.get("is_tracked") else "✗"
+                print(f"  [{tracked}] #{rank} {addr[:8]}...{addr[-4:]} | "
+                      f"{name} ({twitter}) | 24h: ${pnl_24h:,.0f}")
+            print()
+            return
+
+        elif args.agent_status:
+            # Show agent brain status
+            from agent.brain import AgentBrain
+            brain = AgentBrain(settings, db)
+            summary = brain.get_strategy_summary()
+
+            print(f"\n{'='*60}")
+            print(f"  Rome Agent Brain — Strategy Status")
+            print(f"{'='*60}")
+            print(f"  Min Confidence:   {summary['min_confidence']:.2f}")
+            print(f"  Consensus Req:    {summary['consensus_threshold']} wallets")
+            print(f"  Position Scale:   {summary['position_scale']:.1f}x")
+            print(f"  Learning Cycles:  {summary['learning_cycles']}")
+            print(f"{'='*60}")
+            print(f"  Total Decisions:  {summary['total_decisions']}")
+            print(f"  Wins / Losses:    {summary['wins']} / {summary['losses']}")
+            print(f"  Win Rate:         {summary['win_rate']:.1f}%")
+            print(f"  Total PnL:        {summary['total_pnl_sol']:.4f} SOL")
+            print(f"  Best Trade:       {summary['best_trade_sol']:.4f} SOL")
+            print(f"  Worst Trade:      {summary['worst_trade_sol']:.4f} SOL")
+            print(f"  Trust Adjusted:   {summary['trusted_wallets_adjusted']} wallets")
+            print(f"  Blacklisted:      {summary['blacklisted_tokens']} tokens")
+            print(f"{'='*60}\n")
+            return
+
+        elif args.agent_learn:
+            # Run the agent's learning cycle
+            from agent.brain import AgentBrain
+            brain = AgentBrain(settings, db)
+
+            print("Running agent learning cycle...")
+            insights = await brain.learn_from_journal()
+
+            print(f"\n{'='*60}")
+            print(f"  Agent Learning Report")
+            print(f"{'='*60}")
+            print(f"  Decisions Analyzed: {insights['decisions_analyzed']}")
+            if insights["adjustments"]:
+                print(f"  Adjustments Made:")
+                for adj in insights["adjustments"]:
+                    print(f"    • {adj}")
+            else:
+                print(f"  No adjustments needed.")
+            print(f"{'='*60}\n")
             return
 
         elif args.add_wallet:
@@ -380,6 +518,114 @@ async def main() -> None:
                 side_wallets_promoted=len(side_wallets),
                 note="Side wallets are now monitored. Run the bot to start copying them.",
             )
+
+        elif args.agent:
+            # Agent mode — autonomous trading with learning loop
+            logger.info("mode_agent")
+            from agent.brain import AgentBrain
+            from monitor.wallet_monitor import WalletMonitor
+            from monitor.signal_generator import SignalGenerator
+            from trader.trade_executor import TradeExecutor
+            from trader.position_manager import PositionManager
+
+            # Initialize components
+            executor = TradeExecutor(settings, db, solana)
+            await executor.initialize()
+
+            sig_gen = SignalGenerator(settings, db)
+            await sig_gen.initialize()
+
+            pos_manager = PositionManager(settings, db, executor)
+            await pos_manager.initialize()
+
+            brain = AgentBrain(settings, db)
+
+            # Signal handler: same as full bot, but signals also feed the agent
+            async def on_wallet_signal(signal: dict) -> None:
+                should_trade, enriched, skip_reason = await sig_gen.validate_signal(signal)
+                if should_trade:
+                    result = await executor.handle_signal(enriched)
+                    if result:
+                        logger.info("copy_trade_result", status=result.get("status"))
+
+            monitor = WalletMonitor(settings, db, solana, on_signal=on_wallet_signal)
+            await monitor.initialize()
+
+            logger.info(
+                "agent_ready",
+                trading_mode=settings.trading_mode,
+                cycle_interval=f"{settings.agent_cycle_interval}s",
+                learn_interval=f"{settings.agent_learn_interval}s",
+            )
+
+            # Agent decision loop
+            async def agent_loop():
+                """Run the agent brain on a timer."""
+                cycle = 0
+                while True:
+                    cycle += 1
+                    try:
+                        decisions = await brain.run_cycle()
+                        for decision in decisions:
+                            if decision["decision"] == "buy":
+                                # Execute through the trade executor
+                                signal = {
+                                    "wallet_address": "agent_brain",
+                                    "token_mint": decision["token_mint"],
+                                    "token_symbol": decision.get("token_symbol"),
+                                    "signal_type": "buy",
+                                    "wallet_score": decision.get("avg_wallet_score", 50),
+                                    "confidence": decision["confidence"],
+                                }
+                                result = await executor.handle_signal(signal)
+                                if result and result.get("trade_id"):
+                                    # Log that the decision was executed
+                                    logger.info(
+                                        "agent_trade_executed",
+                                        token=decision.get("token_symbol"),
+                                        confidence=decision["confidence"],
+                                        amount=decision.get("amount_sol"),
+                                    )
+                    except Exception as e:
+                        logger.error("agent_cycle_error", error=str(e), cycle=cycle)
+
+                    await asyncio.sleep(settings.agent_cycle_interval)
+
+            # Agent learning loop
+            async def learning_loop():
+                """Periodically review journal and adjust strategy."""
+                while True:
+                    await asyncio.sleep(settings.agent_learn_interval)
+                    try:
+                        insights = await brain.learn_from_journal()
+                        if insights.get("adjustments"):
+                            logger.info(
+                                "agent_learned",
+                                adjustments=len(insights["adjustments"]),
+                            )
+                    except Exception as e:
+                        logger.error("agent_learn_error", error=str(e))
+
+            print(f"\n{'='*60}")
+            print(f"  Rome Agent Brain — ONLINE")
+            print(f"  Mode: {settings.trading_mode}")
+            print(f"  Decision cycle: every {settings.agent_cycle_interval}s")
+            print(f"  Learning cycle: every {settings.agent_learn_interval}s")
+            print(f"{'='*60}\n")
+
+            try:
+                await asyncio.gather(
+                    monitor.start(),
+                    pos_manager.start(),
+                    agent_loop(),
+                    learning_loop(),
+                )
+            except asyncio.CancelledError:
+                pass
+
+            await sig_gen.close()
+            await executor.close()
+            await pos_manager.close()
 
         else:
             # Full bot mode — start all modules concurrently

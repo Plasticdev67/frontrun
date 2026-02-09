@@ -276,6 +276,25 @@ class Settings:
     )
 
     # =========================================================================
+    # Agent Brain (Session 8 — Autonomous Decision Engine)
+    # =========================================================================
+
+    # Enable the agent brain (vs pure copy-trading mode)
+    agent_enabled: bool = field(
+        default_factory=lambda: _get_env("AGENT_ENABLED", "false").lower() == "true"
+    )
+
+    # How often the agent runs a decision cycle (in seconds)
+    agent_cycle_interval: int = field(
+        default_factory=lambda: _get_env_int("AGENT_CYCLE_INTERVAL", 60)
+    )
+
+    # How often the agent reviews its journal and learns (in seconds)
+    agent_learn_interval: int = field(
+        default_factory=lambda: _get_env_int("AGENT_LEARN_INTERVAL", 3600)
+    )
+
+    # =========================================================================
     # System
     # =========================================================================
 

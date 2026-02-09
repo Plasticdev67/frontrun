@@ -298,4 +298,81 @@ CREATE INDEX IF NOT EXISTS idx_cluster_members_cluster ON wallet_cluster_members
 CREATE INDEX IF NOT EXISTS idx_cluster_members_wallet ON wallet_cluster_members(wallet_address);
 CREATE INDEX IF NOT EXISTS idx_cluster_members_side ON wallet_cluster_members(is_side_wallet);
 
+-- =============================================
+-- FOMO Traders: top traders from the FOMO leaderboard
+-- We track them separately because they're proven
+-- performers we want to study and potentially copy
+-- =============================================
+CREATE TABLE IF NOT EXISTS fomo_traders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    wallet_address TEXT UNIQUE NOT NULL,    -- Full Solana wallet address
+    username TEXT,                          -- FOMO display name (e.g., "[PN] asta")
+    twitter_handle TEXT,                   -- Twitter @handle (e.g., "@astasol")
+    platform TEXT DEFAULT 'fomo',          -- Source: 'fomo', 'frontrun', 'kolscan'
+
+    -- Leaderboard data
+    ranking INTEGER,                       -- Their rank on the leaderboard
+    pnl_24h_usd REAL DEFAULT 0,           -- 24-hour PnL in USD
+    pnl_7d_usd REAL DEFAULT 0,            -- 7-day PnL in USD
+    pnl_30d_usd REAL DEFAULT 0,           -- 30-day PnL in USD
+    pnl_all_time_usd REAL DEFAULT 0,      -- All-time PnL in USD
+
+    -- Tracking
+    is_tracked BOOLEAN DEFAULT TRUE,       -- Are we actively following this trader?
+    notes TEXT,                            -- Manual notes about this trader
+
+    -- Timestamps
+    first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =============================================
+-- Agent Decisions: the AI agent's decision journal
+-- Every decision the agent makes is logged here —
+-- what it decided, why, and what happened
+-- =============================================
+CREATE TABLE IF NOT EXISTS agent_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    -- What token
+    token_mint TEXT NOT NULL,
+    token_symbol TEXT,
+
+    -- The decision
+    decision TEXT NOT NULL,                -- 'buy', 'sell', 'hold', 'skip'
+    confidence REAL DEFAULT 0,            -- 0.0 to 1.0 — how sure the agent was
+    reasons TEXT,                          -- JSON array of reasons for the decision
+
+    -- Signal aggregation data
+    wallets_buying INTEGER DEFAULT 0,     -- How many wallets were buying
+    wallets_selling INTEGER DEFAULT 0,    -- How many wallets were selling
+    avg_wallet_score REAL DEFAULT 0,      -- Average score of buying wallets
+
+    -- Token context at decision time
+    market_cap_usd REAL,
+    liquidity_usd REAL,
+
+    -- Execution
+    executed BOOLEAN DEFAULT FALSE,       -- Was this decision acted on?
+    trade_id INTEGER,                     -- Link to the trade if executed
+    amount_sol REAL DEFAULT 0,            -- How much SOL was allocated
+
+    -- Outcome (filled when position closes)
+    outcome_pnl_sol REAL,                 -- Realized PnL from this decision
+    outcome_multiplier REAL,              -- Price multiple achieved
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (trade_id) REFERENCES trades(id)
+);
+
+-- FOMO + Agent indexes
+CREATE INDEX IF NOT EXISTS idx_fomo_traders_wallet ON fomo_traders(wallet_address);
+CREATE INDEX IF NOT EXISTS idx_fomo_traders_ranking ON fomo_traders(ranking);
+CREATE INDEX IF NOT EXISTS idx_fomo_traders_tracked ON fomo_traders(is_tracked);
+CREATE INDEX IF NOT EXISTS idx_agent_decisions_token ON agent_decisions(token_mint);
+CREATE INDEX IF NOT EXISTS idx_agent_decisions_decision ON agent_decisions(decision);
+CREATE INDEX IF NOT EXISTS idx_agent_decisions_created ON agent_decisions(created_at);
+
 """

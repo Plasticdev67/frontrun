@@ -76,6 +76,8 @@ class Database:
             ("wallets", "gmgn_sell_30d", "INTEGER DEFAULT 0"),
             ("wallets", "gmgn_tags", "TEXT"),
             ("wallets", "source", "TEXT DEFAULT 'manual'"),
+            # Agent decision outcome columns (Session 8)
+            ("agent_decisions", "outcome_multiplier", "REAL"),
         ]
         for table, column, col_type in migrations:
             try:
@@ -593,6 +595,161 @@ class Database:
         cursor = await self.connection.execute(sql, (wallet_address,))
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+
+    # =========================================================================
+    # FOMO Trader Operations (Session 8: FOMO Leaderboard)
+    # =========================================================================
+
+    async def upsert_fomo_trader(self, trader_data: dict[str, Any]) -> int:
+        """Insert or update a FOMO trader record."""
+        now = datetime.now(timezone.utc).isoformat()
+        sql = """
+            INSERT INTO fomo_traders (
+                wallet_address, username, twitter_handle, platform,
+                ranking, pnl_24h_usd, pnl_7d_usd, pnl_30d_usd,
+                pnl_all_time_usd, is_tracked, notes, last_updated
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(wallet_address) DO UPDATE SET
+                username = excluded.username,
+                twitter_handle = excluded.twitter_handle,
+                ranking = excluded.ranking,
+                pnl_24h_usd = excluded.pnl_24h_usd,
+                pnl_7d_usd = excluded.pnl_7d_usd,
+                pnl_30d_usd = excluded.pnl_30d_usd,
+                pnl_all_time_usd = excluded.pnl_all_time_usd,
+                notes = COALESCE(excluded.notes, fomo_traders.notes),
+                last_updated = excluded.last_updated
+        """
+        cursor = await self.connection.execute(sql, (
+            trader_data["wallet_address"],
+            trader_data.get("username"),
+            trader_data.get("twitter_handle"),
+            trader_data.get("platform", "fomo"),
+            trader_data.get("ranking"),
+            trader_data.get("pnl_24h_usd", 0),
+            trader_data.get("pnl_7d_usd", 0),
+            trader_data.get("pnl_30d_usd", 0),
+            trader_data.get("pnl_all_time_usd", 0),
+            trader_data.get("is_tracked", True),
+            trader_data.get("notes"),
+            now,
+        ))
+        await self.connection.commit()
+        return cursor.lastrowid
+
+    async def get_fomo_traders(self, tracked_only: bool = True) -> list[dict]:
+        """Get FOMO traders, optionally filtered to tracked ones only."""
+        if tracked_only:
+            sql = "SELECT * FROM fomo_traders WHERE is_tracked = TRUE ORDER BY ranking ASC"
+        else:
+            sql = "SELECT * FROM fomo_traders ORDER BY ranking ASC"
+        cursor = await self.connection.execute(sql)
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    async def get_fomo_trader(self, wallet_address: str) -> dict | None:
+        """Look up a specific FOMO trader by wallet address."""
+        sql = "SELECT * FROM fomo_traders WHERE wallet_address = ?"
+        cursor = await self.connection.execute(sql, (wallet_address,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+    # =========================================================================
+    # Agent Decision Operations (Session 8: Agent Brain)
+    # =========================================================================
+
+    async def insert_agent_decision(self, decision_data: dict[str, Any]) -> int:
+        """Record an agent decision to the journal."""
+        reasons = decision_data.get("reasons") or []
+        reasons_json = json.dumps(reasons) if isinstance(reasons, list) else "[]"
+
+        sql = """
+            INSERT INTO agent_decisions (
+                token_mint, token_symbol, decision, confidence, reasons,
+                wallets_buying, wallets_selling, avg_wallet_score,
+                market_cap_usd, liquidity_usd,
+                executed, trade_id, amount_sol
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        cursor = await self.connection.execute(sql, (
+            decision_data["token_mint"],
+            decision_data.get("token_symbol"),
+            decision_data["decision"],
+            decision_data.get("confidence", 0),
+            reasons_json,
+            decision_data.get("wallets_buying", 0),
+            decision_data.get("wallets_selling", 0),
+            decision_data.get("avg_wallet_score", 0),
+            decision_data.get("market_cap_usd"),
+            decision_data.get("liquidity_usd"),
+            decision_data.get("executed", False),
+            decision_data.get("trade_id"),
+            decision_data.get("amount_sol", 0),
+        ))
+        await self.connection.commit()
+        return cursor.lastrowid
+
+    async def update_agent_decision_outcome(
+        self, decision_id: int, pnl_sol: float, multiplier: float | None = None
+    ) -> None:
+        """Update a decision's outcome after the position closes."""
+        sql = """
+            UPDATE agent_decisions SET
+                outcome_pnl_sol = ?, outcome_multiplier = ?
+            WHERE id = ?
+        """
+        await self.connection.execute(sql, (pnl_sol, multiplier, decision_id))
+        await self.connection.commit()
+
+    async def mark_agent_decision_executed(self, decision_id: int, trade_id: int) -> None:
+        """Mark a decision as executed, linking it to the trade."""
+        sql = "UPDATE agent_decisions SET executed = TRUE, trade_id = ? WHERE id = ?"
+        await self.connection.execute(sql, (trade_id, decision_id))
+        await self.connection.commit()
+
+    async def get_agent_decisions(self, limit: int = 100) -> list[dict]:
+        """Get recent agent decisions for the journal view."""
+        sql = """
+            SELECT * FROM agent_decisions
+            ORDER BY created_at DESC LIMIT ?
+        """
+        cursor = await self.connection.execute(sql, (limit,))
+        rows = await cursor.fetchall()
+        results = []
+        for r in rows:
+            d = dict(r)
+            # Parse reasons JSON
+            try:
+                d["reasons"] = json.loads(d.get("reasons") or "[]")
+            except (json.JSONDecodeError, TypeError):
+                d["reasons"] = []
+            results.append(d)
+        return results
+
+    async def get_agent_decision_stats(self) -> dict:
+        """Get summary stats for the agent's decision history."""
+        sql = """
+            SELECT
+                COUNT(*) as total_decisions,
+                COALESCE(SUM(CASE WHEN decision = 'buy' THEN 1 ELSE 0 END), 0) as total_buys,
+                COALESCE(SUM(CASE WHEN decision = 'skip' THEN 1 ELSE 0 END), 0) as total_skips,
+                COALESCE(SUM(CASE WHEN executed = TRUE AND outcome_pnl_sol > 0 THEN 1 ELSE 0 END), 0) as wins,
+                COALESCE(SUM(CASE WHEN executed = TRUE AND outcome_pnl_sol <= 0 THEN 1 ELSE 0 END), 0) as losses,
+                COALESCE(SUM(outcome_pnl_sol), 0) as total_pnl,
+                MAX(outcome_pnl_sol) as best_trade,
+                MIN(outcome_pnl_sol) as worst_trade,
+                AVG(CASE WHEN executed = TRUE THEN confidence END) as avg_buy_confidence
+            FROM agent_decisions
+        """
+        cursor = await self.connection.execute(sql)
+        row = await cursor.fetchone()
+        if not row:
+            return {}
+        return dict(row)
+
+    # =========================================================================
+    # Wallet Wipe (preserves tokens, signals, trades, positions)
+    # =========================================================================
 
     async def wipe_wallets(self) -> dict:
         """
