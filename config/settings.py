@@ -70,6 +70,10 @@ class Settings:
     birdeye_api_key: str = field(default_factory=lambda: _get_env("BIRDEYE_API_KEY"))
     birdeye_base_url: str = "https://public-api.birdeye.so"
 
+    # GMGN — cookie-based auth (cf_clearance + __cf_bm from browser)
+    gmgn_cf_clearance: str = field(default_factory=lambda: _get_env("GMGN_CF_CLEARANCE"))
+    gmgn_cf_bm: str = field(default_factory=lambda: _get_env("GMGN_CF_BM"))
+
     # DexScreener — token discovery (free, no key needed)
     dexscreener_base_url: str = "https://api.dexscreener.com"
 

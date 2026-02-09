@@ -16,13 +16,15 @@ Why GMGN over Birdeye for discovery?
 - No API key or rate limits (just needs browser-like headers)
 - Top buyers endpoint gives us wallet PnL per token
 
-No API key needed — just browser-like headers.
+Uses curl_cffi to impersonate Chrome's TLS fingerprint — required to bypass
+Cloudflare's bot detection. Also needs cf_clearance + __cf_bm cookies from
+browser DevTools (Application → Cookies → gmgn.ai). Cookies expire periodically.
 """
 
 import asyncio
 from typing import Any
 
-import aiohttp
+from curl_cffi import requests as curl_requests
 
 from utils.logger import get_logger
 
@@ -31,45 +33,86 @@ logger = get_logger(__name__)
 
 class GMGNClient:
     """
-    Client for the GMGN.ai API.
+    Client for the GMGN.ai API using curl_cffi for Cloudflare bypass.
+
+    Uses curl_cffi with Chrome TLS impersonation — this is what makes
+    Cloudflare accept our requests even though we're not a real browser.
 
     Usage:
-        client = GMGNClient(session)
+        client = GMGNClient(cf_clearance="...", cf_bm="...")
         tokens = await client.get_top_tokens("24h")
         buyers = await client.get_top_buyers("token_address_here")
+        client.close()
     """
 
     BASE_URL = "https://gmgn.ai/defi/quotation/v1"
 
-    # Browser-like headers required by GMGN
+    # Extra headers — curl_cffi handles User-Agent via impersonation
     HEADERS = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "en-US,en;q=0.9",
         "Referer": "https://gmgn.ai/",
         "Origin": "https://gmgn.ai",
     }
 
-    def __init__(self, session: aiohttp.ClientSession):
-        self.session = session
+    def __init__(self, cf_clearance: str = "", cf_bm: str = "", **_kwargs):
+        self.cf_clearance = cf_clearance
+        self.cf_bm = cf_bm
+        # curl_cffi session with Chrome TLS fingerprint
+        self._session = curl_requests.Session(impersonate="chrome")
+
+    def close(self):
+        """Clean up the curl_cffi session."""
+        if self._session:
+            self._session.close()
+
+    @property
+    def _cookies(self) -> dict:
+        """Build Cloudflare cookies dict."""
+        cookies = {}
+        if self.cf_clearance:
+            cookies["cf_clearance"] = self.cf_clearance
+        if self.cf_bm:
+            cookies["__cf_bm"] = self.cf_bm
+        return cookies
+
+    @property
+    def is_authenticated(self) -> bool:
+        """Whether we have Cloudflare cookie auth configured."""
+        return bool(self.cf_clearance)
 
     async def _get(self, endpoint: str, params: dict | None = None) -> dict:
-        """Make a GET request to the GMGN API."""
+        """
+        Make a GET request to the GMGN API.
+
+        Uses asyncio.to_thread to run the synchronous curl_cffi request
+        in a thread pool — keeps the rest of our async pipeline non-blocking.
+        """
         url = f"{self.BASE_URL}{endpoint}"
         try:
-            async with self.session.get(url, headers=self.HEADERS, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data
-                elif response.status == 429:
-                    logger.warning("gmgn_rate_limited", endpoint=endpoint)
-                    await asyncio.sleep(3)
-                    return await self._get(endpoint, params)
-                else:
-                    # GMGN is Cloudflare-protected — 403 is expected without cookie auth
-                    # Log at debug to avoid spamming logs
-                    logger.debug("gmgn_blocked", status=response.status, endpoint=endpoint, note="Cloudflare — needs cookie auth")
-                    return {}
+            response = await asyncio.to_thread(
+                self._session.get,
+                url,
+                headers=self.HEADERS,
+                cookies=self._cookies,
+                params=params,
+                timeout=15,
+            )
+
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 429:
+                logger.warning("gmgn_rate_limited", endpoint=endpoint)
+                await asyncio.sleep(3)
+                return await self._get(endpoint, params)
+            else:
+                logger.debug(
+                    "gmgn_blocked",
+                    status=response.status_code,
+                    endpoint=endpoint,
+                    note="Cloudflare — check cookies",
+                )
+                return {}
         except Exception as e:
             logger.error("gmgn_request_exception", endpoint=endpoint, error=str(e))
             return {}
@@ -126,42 +169,64 @@ class GMGNClient:
         logger.info("gmgn_tokens_fetched", timeframe=timeframe, count=len(rank_data))
         return rank_data if isinstance(rank_data, list) else []
 
-    async def get_top_buyers(
-        self,
-        token_address: str,
-        order_by: str = "profit",
-        direction: str = "desc",
-    ) -> list[dict]:
+    async def get_top_buyers(self, token_address: str) -> list[dict]:
         """
-        Get top buyers for a specific token, with their profit data.
+        Get top buyers/holders for a specific token.
 
-        This replaces Birdeye's top traders endpoint — GMGN returns
-        wallet addresses along with their PnL for this token.
+        Returns wallet addresses with status (hold/sold) and tags
+        (sniper, fresh_wallet, etc). Does NOT include PnL per wallet —
+        use get_wallet_stats() for that.
 
         Args:
             token_address: Solana token mint address
-            order_by: "profit", "bought", "sold"
-            direction: "asc" or "desc"
 
         Returns:
-            List of buyer dicts with wallet address and profit data.
+            List of holder dicts with wallet_address, status, tags.
         """
-        params = {
-            "orderby": order_by,
-            "direction": direction,
-        }
-
-        data = await self._get(f"/tokens/top_buyers/sol/{token_address}", params)
+        data = await self._get(f"/tokens/top_buyers/sol/{token_address}")
 
         if not data:
             return []
 
-        buyers = data.get("data", [])
-        if not isinstance(buyers, list):
-            buyers = []
+        # Response is nested: data.holders.holderInfo[]
+        holders = data.get("data", {}).get("holders", {})
+        holder_info = holders.get("holderInfo", [])
 
-        logger.debug("gmgn_top_buyers_fetched", token=token_address[:8], count=len(buyers))
-        return buyers
+        if not isinstance(holder_info, list):
+            return []
+
+        logger.debug("gmgn_top_buyers_fetched", token=token_address[:8], count=len(holder_info))
+        return holder_info
+
+    async def get_wallet_stats(self, wallet_address: str) -> dict:
+        """
+        Get detailed stats for a specific wallet — PnL, trade frequency, balance.
+
+        This is the key endpoint for wallet scoring. Returns:
+        - realized_profit / realized_profit_30d: Dollar profits
+        - pnl / pnl_30d / pnl_7d: Return rate (0.05 = 5%)
+        - buy_30d / sell_30d: Trade frequency
+        - sol_balance: Current SOL balance
+        - tags: Smart money labels (e.g., ["smart_degen"])
+        - winrate: Win rate (often None for non-tracked wallets)
+        - risk: Risk assessment dict
+
+        Args:
+            wallet_address: Solana wallet address
+
+        Returns:
+            Wallet stats dict, or empty dict if not found.
+        """
+        data = await self._get(f"/smartmoney/sol/walletNew/{wallet_address}")
+
+        if not data:
+            return {}
+
+        stats = data.get("data", {})
+        if not isinstance(stats, dict):
+            return {}
+
+        return stats
 
     async def get_token_info(self, token_address: str) -> dict:
         """

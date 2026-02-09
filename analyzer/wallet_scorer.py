@@ -115,9 +115,47 @@ class WalletScorer:
         # How many different tokens total (not just winners)
         unique_tokens = len(set(t.get("token_mint") for t in trades if t.get("token_mint")))
 
+        # GMGN enrichment data (from walletNew endpoint)
+        # Use the first trade's GMGN data — it's the same for all trades from this wallet
+        # GMGN sometimes returns strings instead of numbers — safe-convert everything
+        def _float(val, default=0):
+            try:
+                return float(val) if val is not None else default
+            except (ValueError, TypeError):
+                return default
+
+        gmgn_profit = _float(trades[0].get("gmgn_realized_profit"))
+        gmgn_profit_30d = _float(trades[0].get("gmgn_realized_profit_30d"))
+        gmgn_pnl_30d = _float(trades[0].get("gmgn_pnl_30d"))
+        gmgn_buy_30d = int(_float(trades[0].get("gmgn_buy_30d")))
+        gmgn_sol_balance = _float(trades[0].get("gmgn_sol_balance"))
+        gmgn_winrate = trades[0].get("gmgn_winrate")
+        gmgn_tags = trades[0].get("gmgn_tags") or []
+
+        # If GMGN has profit data, use it (it's far more accurate than our per-token tracking)
+        # GMGN profit is in USD — convert roughly: $150/SOL (approximate)
+        effective_pnl = total_pnl
+        if gmgn_profit_30d > 0:
+            effective_pnl = gmgn_profit_30d / 150  # Approximate SOL equivalent
+        elif gmgn_profit > 0:
+            effective_pnl = gmgn_profit / 150
+
+        # If GMGN has win rate, use it
+        effective_win_rate = win_rate
+        effective_total_trades = total_trades
+        if gmgn_winrate is not None:
+            try:
+                effective_win_rate = float(gmgn_winrate)
+                winning_trades = int(effective_win_rate * gmgn_buy_30d) if gmgn_buy_30d else winning_trades
+            except (ValueError, TypeError):
+                pass
+        # If GMGN shows high trade volume, boost the trade count
+        if gmgn_buy_30d > effective_total_trades:
+            effective_total_trades = gmgn_buy_30d
+
         # Calculate individual dimension scores
-        pnl_score = self._score_pnl(total_pnl)
-        win_rate_score = self._score_win_rate(win_rate, total_trades)
+        pnl_score = self._score_pnl(effective_pnl)
+        win_rate_score = self._score_win_rate(effective_win_rate, effective_total_trades)
         timing_score = self._score_timing(avg_entry_rank)
         consistency_score = self._score_consistency(unique_winners, unique_tokens)
 
@@ -130,11 +168,15 @@ class WalletScorer:
             "win_rate_score": round(win_rate_score, 1),
             "timing_score": round(timing_score, 1),
             "consistency_score": round(consistency_score, 1),
-            "total_pnl_sol": round(total_pnl, 4),
-            "total_trades": total_trades,
+            "total_pnl_sol": round(effective_pnl, 4),
+            "total_trades": effective_total_trades,
             "winning_trades": winning_trades,
             "avg_entry_rank": int(avg_entry_rank),
             "unique_winners": unique_winners,
+            "gmgn_realized_profit_usd": round(gmgn_profit, 2),
+            "gmgn_profit_30d_usd": round(gmgn_profit_30d, 2),
+            "gmgn_sol_balance": round(gmgn_sol_balance, 2),
+            "gmgn_tags": gmgn_tags,
             "is_flagged": False,
             "flag_reason": None,
             "is_monitored": False,
@@ -269,14 +311,20 @@ class WalletScorer:
         logger.info("=" * 80)
 
         for i, wallet in enumerate(wallets, 1):
+            gmgn_profit = wallet.get("gmgn_profit_30d_usd", 0)
+            gmgn_tags = wallet.get("gmgn_tags", [])
+            tag_str = ",".join(gmgn_tags[:3]) if gmgn_tags else ""
+
             logger.info(
                 f"#{i}",
                 address=wallet["address"][:8] + "..." + wallet["address"][-4:],
                 total_score=f"{wallet['total_score']}/100",
                 pnl=f"{wallet['total_pnl_sol']:.2f} SOL",
+                gmgn_profit=f"${gmgn_profit:,.0f}" if gmgn_profit else "-",
                 win_rate=f"{wallet['winning_trades']}/{wallet['total_trades']}",
                 avg_rank=wallet["avg_entry_rank"],
                 winners=wallet["unique_winners"],
+                tags=tag_str or "-",
             )
 
         logger.info("=" * 80)

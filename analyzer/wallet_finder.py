@@ -63,13 +63,15 @@ class WalletFinder:
             "X-API-KEY": self.settings.birdeye_api_key,
             "x-chain": "solana",
         }
-        self.gmgn = GMGNClient(self.session)
+        self.gmgn = GMGNClient(cf_clearance=self.settings.gmgn_cf_clearance, cf_bm=self.settings.gmgn_cf_bm)
         logger.info("wallet_finder_initialized")
 
     async def close(self) -> None:
         """Clean up."""
         if self.session:
             await self.session.close()
+        if self.gmgn:
+            self.gmgn.close()
 
     async def find_smart_wallets(self, tokens: list[dict]) -> dict[str, list[dict]]:
         """
@@ -160,49 +162,54 @@ class WalletFinder:
             multi_token_wallets=len(multi_token_wallets),
         )
 
+        # Enrich multi-token wallets with GMGN PnL data
+        # This is what makes wallet scoring meaningful — realized profit, win rate, etc.
+        if multi_token_wallets and self.gmgn and self.gmgn.is_authenticated:
+            gmgn_stats = await self._enrich_wallets_with_gmgn(list(multi_token_wallets.keys()))
+            for addr, trades in multi_token_wallets.items():
+                stats = gmgn_stats.get(addr, {})
+                if stats:
+                    # Attach GMGN stats to all trade records for this wallet
+                    for trade in trades:
+                        trade["gmgn_realized_profit"] = stats.get("realized_profit") or 0
+                        trade["gmgn_realized_profit_30d"] = stats.get("realized_profit_30d") or 0
+                        trade["gmgn_pnl_30d"] = stats.get("pnl_30d") or 0
+                        trade["gmgn_pnl_7d"] = stats.get("pnl_7d") or 0
+                        trade["gmgn_buy_30d"] = stats.get("buy_30d") or 0
+                        trade["gmgn_sell_30d"] = stats.get("sell_30d") or 0
+                        trade["gmgn_sol_balance"] = stats.get("sol_balance") or 0
+                        trade["gmgn_winrate"] = stats.get("winrate")
+                        trade["gmgn_tags"] = stats.get("tags") or []
+
         return multi_token_wallets
 
     async def _get_gmgn_top_buyers(self, token_mint: str) -> list[dict]:
         """
         Get top buyers for a token from GMGN.ai (PRIMARY source).
 
-        GMGN returns wallet addresses with profit data per token.
-        This replaces Birdeye's top traders endpoint which gets rate-limited.
+        GMGN returns wallet addresses with status (hold/sold) and tags
+        (sniper, fresh_wallet, smart_degen, etc). We extract the addresses
+        and their tags — PnL enrichment happens later via get_wallet_stats().
         """
         try:
-            raw_buyers = await self.gmgn.get_top_buyers(token_mint)
-            if not raw_buyers:
+            holders = await self.gmgn.get_top_buyers(token_mint)
+            if not holders:
                 return []
 
             traders = []
-            for buyer in raw_buyers:
-                # GMGN buyer fields vary — handle multiple key names
-                address = buyer.get("address") or buyer.get("wallet_address") or ""
+            for holder in holders:
+                address = holder.get("wallet_address") or holder.get("address") or ""
                 if not address:
                     continue
 
-                # Profit data
-                profit = buyer.get("profit") or buyer.get("realized_profit") or 0
-                bought = buyer.get("bought") or buyer.get("total_cost") or buyer.get("buy_amount_usd") or 0
-                sold = buyer.get("sold") or buyer.get("total_revenue") or buyer.get("sell_amount_usd") or 0
-
-                # Convert to float safely
-                try:
-                    profit = float(profit)
-                    bought = float(bought)
-                    sold = float(sold)
-                except (ValueError, TypeError):
-                    continue
-
-                # Only interested in profitable traders
-                if profit <= 0:
-                    continue
+                tags = holder.get("tags", []) or []
+                maker_tags = holder.get("maker_token_tags", []) or []
 
                 traders.append({
                     "address": address,
-                    "pnl_sol": profit,  # GMGN returns USD profit — close enough for scoring
-                    "buy_amount_sol": bought,
-                    "sell_amount_sol": sold,
+                    "status": holder.get("status", ""),
+                    "tags": tags,
+                    "maker_tags": maker_tags,
                     "source": "gmgn_top_buyers",
                 })
 
@@ -212,6 +219,36 @@ class WalletFinder:
         except Exception as e:
             logger.error("gmgn_buyers_exception", error=str(e))
             return []
+
+    async def _enrich_wallets_with_gmgn(self, wallet_addresses: list[str]) -> dict[str, dict]:
+        """
+        Fetch PnL stats for each wallet from GMGN's walletNew endpoint.
+
+        This gives us the real data that makes scoring meaningful:
+        realized_profit, pnl_30d, buy_30d, sol_balance, tags, etc.
+
+        Rate-limited to avoid hammering GMGN — 0.5s between requests.
+        """
+        enriched = {}
+        total = len(wallet_addresses)
+        logger.info("gmgn_wallet_enrichment_starting", wallets=total)
+
+        for i, addr in enumerate(wallet_addresses):
+            try:
+                stats = await self.gmgn.get_wallet_stats(addr)
+                if stats:
+                    enriched[addr] = stats
+                # Rate limit
+                await asyncio.sleep(0.5)
+            except Exception as e:
+                logger.debug("gmgn_wallet_stats_error", wallet=addr[:8], error=str(e))
+
+            # Progress log every 10 wallets
+            if (i + 1) % 10 == 0:
+                logger.info("gmgn_enrichment_progress", progress=f"{i+1}/{total}")
+
+        logger.info("gmgn_wallet_enrichment_complete", enriched=len(enriched), total=total)
+        return enriched
 
     async def _get_birdeye_top_traders(self, token_mint: str) -> list[dict]:
         """

@@ -268,14 +268,16 @@ class TokenScanner:
         self.session = aiohttp.ClientSession()
         self.birdeye = BirdeyeClient(self.settings.birdeye_api_key, self.session)
         self.dexscreener = DexScreenerClient(self.session)
-        self.gmgn = GMGNClient(self.session)
+        self.gmgn = GMGNClient(cf_clearance=self.settings.gmgn_cf_clearance, cf_bm=self.settings.gmgn_cf_bm)
         self.gecko = GeckoTerminalClient(self.session)
         logger.info("token_scanner_initialized")
 
     async def close(self) -> None:
-        """Clean up HTTP session."""
+        """Clean up HTTP sessions."""
         if self.session:
             await self.session.close()
+        if self.gmgn:
+            self.gmgn.close()
 
     async def run_discovery(self) -> list[dict]:
         """
