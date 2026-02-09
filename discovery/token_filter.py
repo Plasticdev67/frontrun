@@ -54,11 +54,12 @@ class TokenFilter:
         """
         Check a single token for quality issues.
         Returns a list of problems found (empty = passed all checks).
+
+        Now includes GMGN safety fields when available.
         """
         issues = []
 
         # Check 1: Volume must be meaningful relative to market cap
-        # If 24h volume is less than 1% of market cap, the token is basically dead
         mcap = token.get("market_cap_usd") or 0
         volume = token.get("volume_24h_usd") or 0
         if mcap > 0 and volume > 0:
@@ -67,7 +68,6 @@ class TokenFilter:
                 issues.append(f"Low volume/mcap ratio: {volume_to_mcap_ratio:.3f}")
 
         # Check 2: Liquidity must be reasonable relative to market cap
-        # Less than 1% liquidity/mcap ratio is suspicious (could be manipulated)
         liquidity = token.get("liquidity_usd") or 0
         if mcap > 0 and liquidity > 0:
             liq_to_mcap_ratio = liquidity / mcap
@@ -78,6 +78,28 @@ class TokenFilter:
         holders = token.get("holder_count") or 0
         if holders > 0 and holders < 50:
             issues.append(f"Very few holders: {holders}")
+
+        # Check 4: GMGN rug ratio (if available)
+        rug_ratio = token.get("gmgn_rug_ratio")
+        if rug_ratio is not None:
+            try:
+                if float(rug_ratio) > 0.5:
+                    issues.append(f"High rug ratio: {rug_ratio}")
+            except (ValueError, TypeError):
+                pass
+
+        # Check 5: GMGN wash trading flag
+        if token.get("gmgn_is_wash_trading"):
+            issues.append("Wash trading detected by GMGN")
+
+        # Check 6: GMGN bundler rate (high = likely bot-bundled launch)
+        bundler_rate = token.get("gmgn_bundler_rate")
+        if bundler_rate is not None:
+            try:
+                if float(bundler_rate) > 0.3:
+                    issues.append(f"High bundler rate: {bundler_rate}")
+            except (ValueError, TypeError):
+                pass
 
         return issues
 
@@ -138,5 +160,25 @@ class TokenFilter:
         # $3M-$30M is the ideal range for finding alpha
         if 3_000_000 <= mcap <= 30_000_000:
             score += 5
+
+        # GMGN smart money bonus (up to 10 points)
+        smart_degen = token.get("gmgn_smart_degen_count") or 0
+        renowned = token.get("gmgn_renowned_count") or 0
+        if smart_degen >= 5 or renowned >= 3:
+            score += 10
+        elif smart_degen >= 2 or renowned >= 1:
+            score += 5
+
+        # GMGN safety penalty (up to -15 points)
+        rug_ratio = token.get("gmgn_rug_ratio")
+        if rug_ratio is not None:
+            try:
+                rr = float(rug_ratio)
+                if rr > 0.3:
+                    score -= 15
+                elif rr > 0.1:
+                    score -= 5
+            except (ValueError, TypeError):
+                pass
 
         return min(100, max(0, score))

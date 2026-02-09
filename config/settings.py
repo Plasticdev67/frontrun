@@ -145,10 +145,11 @@ class Settings:
     )
 
     # --- Market Cap Ranges ---
-    # DISCOVERY: Used to find past winners (Stage 1). Higher floor because
-    # we're looking for tokens that already proved themselves.
+    # DISCOVERY: Used to find past winners (Stage 1). Lowered to $100K
+    # because Solana memecoins pump from $100K→$10M — by $1M the alpha is gone.
+    # Safety comes from liquidity floors and ratio checks, not mcap alone.
     discovery_min_mcap_usd: float = field(
-        default_factory=lambda: _get_env_float("DISCOVERY_MIN_MCAP_USD", 1_000_000)
+        default_factory=lambda: _get_env_float("DISCOVERY_MIN_MCAP_USD", 100_000)
     )
     discovery_max_mcap_usd: float = field(
         default_factory=lambda: _get_env_float("DISCOVERY_MAX_MCAP_USD", 50_000_000)

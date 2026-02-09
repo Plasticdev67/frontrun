@@ -26,6 +26,7 @@ import aiohttp
 
 from config.settings import Settings
 from database.db import Database
+from discovery.gmgn_client import GMGNClient
 from utils.solana_client import SolanaClient
 from utils.logger import get_logger
 
@@ -49,6 +50,7 @@ class WalletFinder:
         self.solana = solana
         self.session: aiohttp.ClientSession | None = None
         self.birdeye_headers: dict = {}
+        self.gmgn: GMGNClient | None = None
 
         # Track wallet appearances across multiple tokens
         # Key: wallet_address, Value: list of tokens they were early on
@@ -61,6 +63,7 @@ class WalletFinder:
             "X-API-KEY": self.settings.birdeye_api_key,
             "x-chain": "solana",
         }
+        self.gmgn = GMGNClient(self.session)
         logger.info("wallet_finder_initialized")
 
     async def close(self) -> None:
@@ -94,10 +97,14 @@ class WalletFinder:
                 multiplier=f"{token.get('price_multiplier') or 0:.1f}x",
             )
 
-            # Method 1: Get top traders from Birdeye (fast, structured data)
-            top_traders = await self._get_birdeye_top_traders(mint)
+            # Method 1 (PRIMARY): Get top buyers from GMGN (PnL data, no rate limits)
+            top_traders = await self._get_gmgn_top_buyers(mint)
 
-            # Method 2: Get early buyers from transaction history (more thorough)
+            # Method 2 (FALLBACK): Try Birdeye if GMGN returned nothing
+            if not top_traders:
+                top_traders = await self._get_birdeye_top_traders(mint)
+
+            # Method 3: Get early buyers from transaction history (timing data)
             early_buyers = await self._get_early_buyers(mint, symbol)
 
             # Combine both lists of wallets
@@ -154,6 +161,57 @@ class WalletFinder:
         )
 
         return multi_token_wallets
+
+    async def _get_gmgn_top_buyers(self, token_mint: str) -> list[dict]:
+        """
+        Get top buyers for a token from GMGN.ai (PRIMARY source).
+
+        GMGN returns wallet addresses with profit data per token.
+        This replaces Birdeye's top traders endpoint which gets rate-limited.
+        """
+        try:
+            raw_buyers = await self.gmgn.get_top_buyers(token_mint)
+            if not raw_buyers:
+                return []
+
+            traders = []
+            for buyer in raw_buyers:
+                # GMGN buyer fields vary — handle multiple key names
+                address = buyer.get("address") or buyer.get("wallet_address") or ""
+                if not address:
+                    continue
+
+                # Profit data
+                profit = buyer.get("profit") or buyer.get("realized_profit") or 0
+                bought = buyer.get("bought") or buyer.get("total_cost") or buyer.get("buy_amount_usd") or 0
+                sold = buyer.get("sold") or buyer.get("total_revenue") or buyer.get("sell_amount_usd") or 0
+
+                # Convert to float safely
+                try:
+                    profit = float(profit)
+                    bought = float(bought)
+                    sold = float(sold)
+                except (ValueError, TypeError):
+                    continue
+
+                # Only interested in profitable traders
+                if profit <= 0:
+                    continue
+
+                traders.append({
+                    "address": address,
+                    "pnl_sol": profit,  # GMGN returns USD profit — close enough for scoring
+                    "buy_amount_sol": bought,
+                    "sell_amount_sol": sold,
+                    "source": "gmgn_top_buyers",
+                })
+
+            logger.debug("gmgn_traders_found", token=token_mint[:8], count=len(traders))
+            return traders
+
+        except Exception as e:
+            logger.error("gmgn_buyers_exception", error=str(e))
+            return []
 
     async def _get_birdeye_top_traders(self, token_mint: str) -> list[dict]:
         """
