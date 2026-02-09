@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 import aiosqlite
@@ -35,6 +36,11 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 app = FastAPI(title="Rome Agent Trader", docs_url=None, redoc_url=None)
+
+# Serve static files (audio, images, etc.)
+STATIC_DIR = Path(__file__).parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # Database path from settings
 DB_PATH = settings.db_path
