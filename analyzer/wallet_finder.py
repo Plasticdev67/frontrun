@@ -91,7 +91,7 @@ class WalletFinder:
                 "analyzing_token",
                 progress=f"{i+1}/{len(tokens)}",
                 symbol=symbol,
-                multiplier=f"{token.get('price_multiplier', 0):.1f}x",
+                multiplier=f"{token.get('price_multiplier') or 0:.1f}x",
             )
 
             # Method 1: Get top traders from Birdeye (fast, structured data)
@@ -109,7 +109,7 @@ class WalletFinder:
                 if address:
                     wallet_data["token_mint"] = mint
                     wallet_data["token_symbol"] = symbol
-                    wallet_data["token_multiplier"] = token.get("price_multiplier", 0)
+                    wallet_data["token_multiplier"] = token.get("price_multiplier") or 0
                     self.wallet_appearances[address].append(wallet_data)
 
                     # Save to database for later analysis
@@ -138,10 +138,13 @@ class WalletFinder:
 
         # Find wallets that appear across multiple winning tokens
         # These are the REAL smart money — not just lucky once
+        # When we have very few tokens (< 5), include single-token wallets too
+        # since there isn't enough data to require multi-token overlap
+        min_appearances = 2 if len(tokens) >= 5 else 1
         multi_token_wallets = {
             addr: trades
             for addr, trades in self.wallet_appearances.items()
-            if len(trades) >= 2  # Must be early on at least 2 different winners
+            if len(trades) >= min_appearances
         }
 
         logger.info(

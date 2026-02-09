@@ -194,7 +194,8 @@ class Settings:
     # =========================================================================
 
     # Minimum score (0-100) for a wallet to be considered "smart money"
-    min_wallet_score: float = 60.0
+    # Lowered from 60 to 30 to allow early-buyer signals when PnL data is limited
+    min_wallet_score: float = 30.0
 
     # Maximum wallets to monitor in real-time (more = more API calls)
     max_monitored_wallets: int = 50
@@ -207,8 +208,8 @@ class Settings:
     discovery_lookback_days: int = 30
 
     # Minimum price increase (as multiplier) to count as a "winner"
-    # 5.0 means the token must have done at least 5x in the lookback period
-    min_price_multiplier: float = 5.0
+    # 2.0 means the token must have done at least 2x in the lookback period
+    min_price_multiplier: float = 2.0
 
     # Maximum tokens to analyze per discovery run
     max_discovery_tokens: int = 100

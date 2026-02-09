@@ -539,8 +539,8 @@ class TokenScanner:
             if multiplier < self.settings.min_price_multiplier:
                 continue
 
-            # Minimum liquidity — $50K floor to ensure we can actually sell
-            if liquidity < 50_000:
+            # Minimum liquidity — $25K floor to ensure we can actually sell
+            if liquidity < 25_000:
                 logger.debug("token_filtered", symbol=symbol, reason=f"low_liquidity_${liquidity:.0f}")
                 continue
 
