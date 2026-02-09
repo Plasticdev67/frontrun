@@ -15,6 +15,7 @@ Usage:
     python main.py --clusters       # Detect wallet clusters + side wallets
     python main.py --dry-run        # Start in dry-run mode (no real trades)
     python main.py --dashboard      # Launch the web dashboard
+    python main.py --discover-fomo  # Discover FOMO wallets from blockchain
 """
 
 import asyncio
@@ -78,6 +79,9 @@ async def main() -> None:
     parser.add_argument("--add-wallet", type=str, nargs="+", help="Add wallet address(es) manually")
     parser.add_argument("--source", type=str, default="manual", help="Source label for --add-wallet (fomo, gmgn, manual)")
     parser.add_argument("--wipe-wallets", action="store_true", help="Delete all wallets and start fresh")
+    parser.add_argument("--discover-fomo", action="store_true", help="Discover FOMO wallets from on-chain data")
+    parser.add_argument("--discover-fomo-limit", type=int, default=1000, help="Max relayer transactions to scan (default 1000)")
+    parser.add_argument("--no-enrich", action="store_true", help="Skip GMGN enrichment (faster but less data)")
     parser.add_argument("--add-fomo-wallet", type=str, nargs="+", help="Add FOMO trader wallet(s) with metadata")
     parser.add_argument("--fomo-list", action="store_true", help="Show all tracked FOMO traders")
     parser.add_argument("--agent", action="store_true", help="Run the agent brain (autonomous mode)")
@@ -146,6 +150,60 @@ async def main() -> None:
             print("\nDatabase is clean. Run --import-smart-money to populate with fresh data.")
             return
 
+        elif getattr(args, "discover_fomo", False):
+            # Discover FOMO wallets from on-chain blockchain data
+            logger.info("mode_discover_fomo")
+            from discovery.fomo_discoverer import FomoDiscoverer, _float
+
+            discoverer = FomoDiscoverer(settings, db, solana)
+
+            max_txs = getattr(args, "discover_fomo_limit", 1000)
+            enrich = not getattr(args, "no_enrich", False)
+
+            print(f"\n{'='*60}")
+            print(f"  FOMO On-Chain Wallet Discovery")
+            print(f"  Scanning {max_txs} relayer transactions...")
+            if enrich:
+                print(f"  GMGN enrichment: ON (slower, better data)")
+            else:
+                print(f"  GMGN enrichment: OFF (fast mode)")
+            print(f"{'='*60}")
+
+            wallets = await discoverer.discover(
+                max_transactions=max_txs,
+                enrich=enrich,
+            )
+
+            if wallets:
+                # Show summary
+                enriched = [w for w in wallets if w.get("profit_30d")]
+                profitable = [w for w in enriched if (w.get("profit_30d") or 0) > 0]
+
+                print(f"\n{'='*60}")
+                print(f"  Discovery Complete")
+                print(f"  New wallets imported: {len(wallets)}")
+                if enriched:
+                    print(f"  With profit data: {len(enriched)}")
+                    print(f"  Profitable (30D): {len(profitable)}")
+
+                    # Sort by profit and show top 5
+                    enriched.sort(key=lambda w: w.get("profit_30d", 0), reverse=True)
+                    print(f"\n  Top 5 by 30D Profit:")
+                    for i, w in enumerate(enriched[:5]):
+                        addr = w["address"]
+                        wr = w.get("winrate")
+                        wr_str = f"{_float(wr)*100:.0f}%" if wr is not None else "-"
+                        tags_str = ", ".join(w.get("tags", [])[:3]) or "-"
+                        print(f"    {i+1}. {addr[:8]}...{addr[-4:]} | "
+                              f"30D: ${w.get('profit_30d', 0):,.0f} | "
+                              f"WR: {wr_str} | Tags: {tags_str}")
+                print(f"{'='*60}")
+                print(f"\n  All wallets are MONITORED and tracked as FOMO traders.")
+                print(f"  View them on the dashboard or with --fomo-list")
+            else:
+                print("\n  No new wallets discovered.")
+            return
+
         elif args.add_fomo_wallet:
             # Add FOMO trader wallet(s) — enrich via GMGN and add to both tables
             from discovery.gmgn_client import GMGNClient
@@ -203,8 +261,8 @@ async def main() -> None:
                 await db.upsert_wallet(wallet_data)
                 added += 1
 
-                wr_display = f"{_f(winrate)*100:.0f}%" if winrate is not None else "—"
-                print(f"  ✓ FOMO trader added: {address[:8]}...{address[-4:]} | "
+                wr_display = f"{_f(winrate)*100:.0f}%" if winrate is not None else "-"
+                print(f"  + FOMO trader added: {address[:8]}...{address[-4:]} | "
                       f"30D: ${profit_30d:,.0f} | WR: {wr_display}")
 
             gmgn.close()
@@ -223,11 +281,11 @@ async def main() -> None:
             print(f"{'='*70}")
             for t in traders:
                 addr = t["wallet_address"]
-                name = t.get("username") or "—"
-                twitter = t.get("twitter_handle") or "—"
-                rank = t.get("ranking") or "—"
+                name = t.get("username") or "-"
+                twitter = t.get("twitter_handle") or "-"
+                rank = t.get("ranking") or "-"
                 pnl_24h = t.get("pnl_24h_usd") or 0
-                tracked = "✓" if t.get("is_tracked") else "✗"
+                tracked = "Y" if t.get("is_tracked") else "N"
                 print(f"  [{tracked}] #{rank} {addr[:8]}...{addr[-4:]} | "
                       f"{name} ({twitter}) | 24h: ${pnl_24h:,.0f}")
             print()
@@ -329,8 +387,8 @@ async def main() -> None:
                 await db.upsert_wallet(wallet_data)
                 added += 1
 
-                wr_display = f"{_f(winrate)*100:.0f}%" if winrate is not None else "—"
-                print(f"  ✓ Added {address[:8]}...{address[-4:]} | 30D: ${profit_30d:,.0f} | WR: {wr_display} | Source: {source.upper()}")
+                wr_display = f"{_f(winrate)*100:.0f}%" if winrate is not None else "-"
+                print(f"  + Added {address[:8]}...{address[-4:]} | 30D: ${profit_30d:,.0f} | WR: {wr_display} | Source: {source.upper()}")
 
             gmgn.close()
             print(f"\nDone. Added {added} wallet(s) — all set to MONITORED.")
@@ -396,9 +454,9 @@ async def main() -> None:
             print(f"\nTop 5 wallets:")
             for i, w in enumerate(wallets[:5]):
                 wr = w.get("gmgn_winrate")
-                wr_str = f"{wr*100:.0f}%" if wr is not None else "—"
+                wr_str = f"{wr*100:.0f}%" if wr is not None else "-"
                 tags = w.get("gmgn_tags", [])
-                tag_str = ", ".join(tags[:3]) if tags else "—"
+                tag_str = ", ".join(tags[:3]) if tags else "-"
                 print(f"  {i+1}. {w['address'][:8]}...{w['address'][-4:]} | "
                       f"30D: ${w['gmgn_profit_30d_usd']:,.0f} | "
                       f"WR: {wr_str} | "
