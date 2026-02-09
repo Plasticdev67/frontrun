@@ -214,6 +214,28 @@ class Settings:
     max_discovery_tokens: int = 100
 
     # =========================================================================
+    # Cluster Detection (Stage 6 — Side Wallet Discovery)
+    # =========================================================================
+
+    # Bitquery API key — optional, used to fetch top traders from leaderboards
+    bitquery_api_key: str = field(default_factory=lambda: _get_env("BITQUERY_API_KEY"))
+
+    # Max seed wallets to analyze per cluster run (each costs ~1200 Helius credits)
+    max_cluster_seeds: int = field(
+        default_factory=lambda: _get_env_int("MAX_CLUSTER_SEEDS", 20)
+    )
+
+    # Minimum confidence score (0-1) for a wallet relationship to be saved
+    min_cluster_confidence: float = field(
+        default_factory=lambda: _get_env_float("MIN_CLUSTER_CONFIDENCE", 0.3)
+    )
+
+    # Max side wallets to auto-promote to monitored per cluster run
+    max_cluster_monitored: int = field(
+        default_factory=lambda: _get_env_int("MAX_CLUSTER_MONITORED", 10)
+    )
+
+    # =========================================================================
     # System
     # =========================================================================
 

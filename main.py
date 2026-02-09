@@ -12,6 +12,7 @@ Usage:
     python main.py                  # Normal startup
     python main.py --discover       # Run token discovery only
     python main.py --analyze        # Run wallet analysis only
+    python main.py --clusters       # Detect wallet clusters + side wallets
     python main.py --dry-run        # Start in dry-run mode (no real trades)
     python main.py --dashboard      # Launch the web dashboard
 """
@@ -70,6 +71,7 @@ async def main() -> None:
     parser.add_argument("--discover", action="store_true", help="Run token discovery only")
     parser.add_argument("--analyze", action="store_true", help="Run wallet analysis only")
     parser.add_argument("--dry-run", action="store_true", help="Start in dry-run mode")
+    parser.add_argument("--clusters", action="store_true", help="Detect wallet clusters and side wallets")
     parser.add_argument("--dashboard", action="store_true", help="Launch web dashboard")
     parser.add_argument("--mode", choices=["live", "dry_run", "alert_only"], help="Override trading mode")
     args = parser.parse_args()
@@ -181,6 +183,50 @@ async def main() -> None:
                 [w for w in scored_wallets if not w.get("is_flagged")]
             )
             logger.info("analysis_complete", monitored_wallets=len(monitored))
+
+        elif args.clusters:
+            # Stage 6: Detect wallet clusters and side wallets
+            # Requires --analyze to have been run first (needs scored wallets in DB)
+            logger.info("mode_cluster_detection")
+
+            from analyzer.cluster_detector import ClusterDetector
+            from analyzer.platform_scraper import PlatformScraper
+
+            # Step 1 (optional): Fetch extra seed wallets from platform leaderboards
+            if settings.bitquery_api_key:
+                logger.info("fetching_platform_wallets")
+                scraper = PlatformScraper(settings, db)
+                await scraper.initialize()
+                platform_wallets = await scraper.fetch_top_traders(limit=100)
+                await scraper.close()
+                logger.info("platform_wallets_fetched", count=len(platform_wallets))
+            else:
+                logger.info("platform_scraper_skipped", reason="No BITQUERY_API_KEY set")
+
+            # Step 2: Get top-scored wallets from DB as seed wallets
+            seed_rows = await db.get_top_wallets(limit=settings.max_cluster_seeds)
+            seed_wallets = [w["address"] for w in seed_rows if w.get("address")]
+
+            if not seed_wallets:
+                logger.error("no_seed_wallets", note="Run --analyze first to score wallets")
+                return
+
+            logger.info("cluster_seeds", count=len(seed_wallets))
+
+            # Step 3: Run cluster detection
+            detector = ClusterDetector(settings, db, solana)
+            await detector.initialize()
+            clusters = await detector.detect_clusters(seed_wallets)
+            await detector.close()
+
+            # Step 4: Report results
+            side_wallets = await db.get_side_wallets()
+            logger.info(
+                "cluster_detection_complete",
+                clusters_found=len(clusters),
+                side_wallets_promoted=len(side_wallets),
+                note="Side wallets are now monitored. Run the bot to start copying them.",
+            )
 
         else:
             # Full bot mode — start all modules concurrently

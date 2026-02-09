@@ -451,3 +451,92 @@ class Database:
         await self.connection.commit()
 
         return stats
+
+    # =========================================================================
+    # Cluster Operations (Stage 6: Cluster Detection)
+    # =========================================================================
+
+    async def create_cluster(self, cluster_data: dict[str, Any]) -> int:
+        """Create a new wallet cluster. Returns the cluster ID."""
+        sql = """
+            INSERT INTO wallet_clusters (
+                seed_wallet, cluster_label, total_members,
+                best_side_wallet, avg_lead_time_seconds
+            ) VALUES (?, ?, ?, ?, ?)
+        """
+        cursor = await self.connection.execute(sql, (
+            cluster_data["seed_wallet"],
+            cluster_data.get("cluster_label"),
+            cluster_data.get("total_members", 0),
+            cluster_data.get("best_side_wallet"),
+            cluster_data.get("avg_lead_time_seconds", 0),
+        ))
+        await self.connection.commit()
+        return cursor.lastrowid
+
+    async def add_cluster_member(self, member_data: dict[str, Any]) -> int:
+        """Add a wallet to a cluster. Returns the member record ID."""
+        sql = """
+            INSERT INTO wallet_cluster_members (
+                cluster_id, wallet_address, relationship_type,
+                is_side_wallet, confidence, avg_lead_time_seconds, evidence
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
+        cursor = await self.connection.execute(sql, (
+            member_data["cluster_id"],
+            member_data["wallet_address"],
+            member_data["relationship_type"],
+            member_data.get("is_side_wallet", False),
+            member_data.get("confidence", 0),
+            member_data.get("avg_lead_time_seconds", 0),
+            member_data.get("evidence"),
+        ))
+        await self.connection.commit()
+        return cursor.lastrowid
+
+    async def get_cluster_by_seed(self, seed_wallet: str) -> dict | None:
+        """Look up if we've already analyzed this seed wallet."""
+        sql = "SELECT * FROM wallet_clusters WHERE seed_wallet = ?"
+        cursor = await self.connection.execute(sql, (seed_wallet,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+    async def get_cluster_members(self, cluster_id: int) -> list[dict]:
+        """Get all members of a specific cluster."""
+        sql = "SELECT * FROM wallet_cluster_members WHERE cluster_id = ? ORDER BY confidence DESC"
+        cursor = await self.connection.execute(sql, (cluster_id,))
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    async def get_side_wallets(self) -> list[dict]:
+        """Get all identified side wallets across all clusters."""
+        sql = """
+            SELECT wcm.*, wc.seed_wallet, w.total_score, w.is_monitored
+            FROM wallet_cluster_members wcm
+            JOIN wallet_clusters wc ON wcm.cluster_id = wc.id
+            LEFT JOIN wallets w ON wcm.wallet_address = w.address
+            WHERE wcm.is_side_wallet = TRUE
+            ORDER BY wcm.confidence DESC
+        """
+        cursor = await self.connection.execute(sql)
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    async def get_all_clusters(self) -> list[dict]:
+        """Get all clusters with summary info."""
+        sql = """
+            SELECT wc.*, w.total_score as seed_score
+            FROM wallet_clusters wc
+            LEFT JOIN wallets w ON wc.seed_wallet = w.address
+            ORDER BY wc.avg_lead_time_seconds DESC
+        """
+        cursor = await self.connection.execute(sql)
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    async def get_wallet_token_trades_for_wallet(self, wallet_address: str) -> list[dict]:
+        """Get all token trades for a specific wallet."""
+        sql = "SELECT * FROM wallet_token_trades WHERE wallet_address = ?"
+        cursor = await self.connection.execute(sql, (wallet_address,))
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]

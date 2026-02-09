@@ -230,6 +230,46 @@ CREATE TABLE IF NOT EXISTS daily_stats (
 );
 
 -- =============================================
+-- Wallet clusters: groups of linked wallets
+-- controlled by the same operator
+-- =============================================
+CREATE TABLE IF NOT EXISTS wallet_clusters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    seed_wallet TEXT NOT NULL,             -- The "public" wallet from leaderboards
+    cluster_label TEXT,                    -- Human-readable label
+    total_members INTEGER DEFAULT 0,      -- How many wallets in this cluster
+    best_side_wallet TEXT,                 -- Wallet with longest avg lead time
+    avg_lead_time_seconds REAL DEFAULT 0, -- Average seconds the side wallet buys ahead
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (seed_wallet) REFERENCES wallets(address)
+);
+
+-- =============================================
+-- Members within each wallet cluster
+-- =============================================
+CREATE TABLE IF NOT EXISTS wallet_cluster_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    cluster_id INTEGER NOT NULL,
+    wallet_address TEXT NOT NULL,
+
+    relationship_type TEXT NOT NULL,       -- "funding_source", "funding_dest",
+                                          -- "transfer_partner", "timing_correlated", "token_overlap"
+    is_side_wallet BOOLEAN DEFAULT FALSE,  -- True if this is the early accumulator
+    confidence REAL DEFAULT 0,            -- 0.0-1.0 confidence in this link
+    avg_lead_time_seconds REAL DEFAULT 0, -- How far ahead this wallet buys (seconds)
+    evidence TEXT,                        -- JSON with relationship details
+
+    discovered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (cluster_id) REFERENCES wallet_clusters(id)
+);
+
+-- =============================================
 -- Indexes for fast lookups
 -- =============================================
 CREATE INDEX IF NOT EXISTS idx_wallets_score ON wallets(total_score DESC);
@@ -240,5 +280,9 @@ CREATE INDEX IF NOT EXISTS idx_signals_created ON signals(created_at);
 CREATE INDEX IF NOT EXISTS idx_positions_status ON positions(status);
 CREATE INDEX IF NOT EXISTS idx_wallet_token_trades_wallet ON wallet_token_trades(wallet_address);
 CREATE INDEX IF NOT EXISTS idx_wallet_token_trades_token ON wallet_token_trades(token_mint);
+CREATE INDEX IF NOT EXISTS idx_clusters_seed ON wallet_clusters(seed_wallet);
+CREATE INDEX IF NOT EXISTS idx_cluster_members_cluster ON wallet_cluster_members(cluster_id);
+CREATE INDEX IF NOT EXISTS idx_cluster_members_wallet ON wallet_cluster_members(wallet_address);
+CREATE INDEX IF NOT EXISTS idx_cluster_members_side ON wallet_cluster_members(is_side_wallet);
 
 """
