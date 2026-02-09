@@ -1127,6 +1127,14 @@
         <li class="nav-item">
             <a class="nav-link" href="#" data-tab="journal">Journal</a>
         </li>
+        <li class="nav-separator">&#9670;</li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-tab="fomo">FOMO Traders</a>
+        </li>
+        <li class="nav-separator">&#9670;</li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-tab="agent">Agent Brain</a>
+        </li>
     </ul>
 
     <!-- Tab Content -->
@@ -1134,6 +1142,8 @@
     <div id="tab-smart-money" style="display:none"></div>
     <div id="tab-live-feed" style="display:none"></div>
     <div id="tab-journal" style="display:none"></div>
+    <div id="tab-fomo" style="display:none"></div>
+    <div id="tab-agent" style="display:none"></div>
 </div>
 
 <!-- Modal Container -->
@@ -1818,6 +1828,8 @@ async function loadTab(name) {
         case 'smart-money': return loadSmartMoney();
         case 'live-feed': return loadLiveFeed();
         case 'journal': return loadJournal();
+        case 'fomo': return loadFomoTraders();
+        case 'agent': return loadAgentBrain();
     }
 }
 
@@ -2398,6 +2410,230 @@ async function loadJournal() {
             });
         }
     }
+    updateRefreshTimer();
+}
+
+// =========================================================================
+// FOMO Traders Tab
+// =========================================================================
+async function loadFomoTraders() {
+    const data = await fetchApi('/api/fomo_traders');
+    const el = document.getElementById('tab-fomo');
+    if (!data) {
+        el.innerHTML = '<div class="card-roman p-4 text-center" style="color:var(--text-dim)">Failed to load FOMO data</div>';
+        return;
+    }
+
+    const traders = data.traders || [];
+
+    let html = `
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="card-roman p-3 text-center">
+            <div style="font-size:28px; font-family:var(--font-display); color:var(--accent-gold)">${traders.length}</div>
+            <div class="stat-label">Tracked Traders</div>
+        </div></div>
+        <div class="col-md-3"><div class="card-roman p-3 text-center">
+            <div style="font-size:28px; font-family:var(--font-display); color:var(--accent-green)">${traders.filter(t => t.is_monitored).length}</div>
+            <div class="stat-label">Monitored</div>
+        </div></div>
+        <div class="col-md-3"><div class="card-roman p-3 text-center">
+            <div style="font-size:28px; font-family:var(--font-display); color:var(--accent-gold)">$${traders.reduce((s,t) => s + (t.pnl_24h_usd || 0), 0).toLocaleString(undefined, {maximumFractionDigits:0})}</div>
+            <div class="stat-label">Combined 24h PnL</div>
+        </div></div>
+        <div class="col-md-3"><div class="card-roman p-3 text-center">
+            <div style="font-size:28px; font-family:var(--font-display); color:var(--accent-gold)">$${traders.reduce((s,t) => s + (t.pnl_30d_usd || 0), 0).toLocaleString(undefined, {maximumFractionDigits:0})}</div>
+            <div class="stat-label">Combined 30d PnL</div>
+        </div></div>
+    </div>
+
+    <div class="card-roman p-3 mb-3">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px">
+            <h6 style="font-family:var(--font-display); color:var(--accent-gold); margin:0; letter-spacing:1px">FOMO LEADERBOARD TRADERS</h6>
+            <span class="badge" style="background:var(--bg-secondary); color:var(--text-dim); font-size:11px">Add via CLI: --add-fomo-wallet</span>
+        </div>`;
+
+    if (traders.length === 0) {
+        html += `
+        <div class="text-center py-5" style="color:var(--text-dim)">
+            <div style="font-size:48px; margin-bottom:12px; opacity:0.3">&#9776;</div>
+            <p style="font-family:var(--font-serif); font-size:16px">No FOMO traders tracked yet</p>
+            <p style="font-size:12px">Add wallet addresses from the FOMO leaderboard:</p>
+            <code style="background:var(--bg-secondary); padding:6px 12px; border-radius:4px; font-size:12px">python main.py --add-fomo-wallet &lt;address&gt;</code>
+        </div>`;
+    } else {
+        html += `<div class="table-responsive"><table class="table-roman"><thead><tr>
+            <th style="width:40px">#</th><th>Wallet</th><th>Name</th><th>Twitter</th>
+            <th class="text-end">24h PnL</th><th class="text-end">30d PnL</th>
+            <th class="text-end">GMGN Profit</th><th class="text-end">Win Rate</th>
+            <th>Tags</th><th class="text-center">Status</th>
+        </tr></thead><tbody>`;
+
+        traders.forEach((t, i) => {
+            const addr = t.wallet_address || '';
+            const short = addr ? addr.slice(0,6)+'...'+addr.slice(-4) : '\u2014';
+            const name = t.username || '\u2014';
+            const tw = t.twitter_handle ? '@'+t.twitter_handle.replace('@','') : '\u2014';
+            const p24 = t.pnl_24h_usd || 0;
+            const p30 = t.pnl_30d_usd || 0;
+            const gp = t.gmgn_profit_30d || 0;
+            const wr = t.gmgn_winrate != null ? (t.gmgn_winrate*100).toFixed(0)+'%' : '\u2014';
+            const tags = Array.isArray(t.gmgn_tags) ? t.gmgn_tags : [];
+            const rank = t.ranking || (i+1);
+            const c24 = p24 >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+            const c30 = p30 >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+            const cg = gp >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+
+            html += `<tr>
+                <td style="font-family:var(--font-display);color:var(--accent-gold)">${rank}</td>
+                <td><span class="addr-copy" onclick="navigator.clipboard.writeText('${addr}')" title="Click to copy" style="cursor:pointer;font-family:monospace;font-size:12px">${short}</span></td>
+                <td style="font-family:var(--font-serif);font-weight:600">${name}</td>
+                <td style="font-size:12px;color:var(--text-dim)">${tw}</td>
+                <td class="text-end" style="color:${c24};font-weight:500">$${p24.toLocaleString(undefined,{maximumFractionDigits:0})}</td>
+                <td class="text-end" style="color:${c30};font-weight:500">$${p30.toLocaleString(undefined,{maximumFractionDigits:0})}</td>
+                <td class="text-end" style="color:${cg};font-weight:500">$${gp.toLocaleString(undefined,{maximumFractionDigits:0})}</td>
+                <td class="text-end">${wr}</td>
+                <td>${tags.slice(0,3).map(x => '<span class="badge" style="background:var(--bg-secondary);color:var(--text-dim);font-size:10px;margin-right:2px">'+x+'</span>').join('')}</td>
+                <td class="text-center">${t.is_monitored ? '<span style="color:var(--accent-green)">&#9679; Live</span>' : '<span style="color:var(--text-dim)">&#9675; Off</span>'}</td>
+            </tr>`;
+        });
+        html += '</tbody></table></div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+    updateRefreshTimer();
+}
+
+// =========================================================================
+// Agent Brain Tab
+// =========================================================================
+async function loadAgentBrain() {
+    const data = await fetchApi('/api/agent');
+    const el = document.getElementById('tab-agent');
+    if (!data) {
+        el.innerHTML = '<div class="card-roman p-4 text-center" style="color:var(--text-dim)">Failed to load agent data</div>';
+        return;
+    }
+
+    const s = data.strategy || {};
+    const decisions = data.recent_decisions || [];
+    const enabled = data.agent_enabled;
+    const totalTrades = (s.wins||0) + (s.losses||0);
+    const winRate = totalTrades > 0 ? ((s.wins/totalTrades)*100).toFixed(1) : '0.0';
+
+    let html = `
+    <!-- Status Banner -->
+    <div class="card-roman p-3 mb-3" style="border-left:3px solid ${enabled ? 'var(--accent-green)' : 'var(--accent-amber)'}">
+        <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:24px">${enabled ? '&#9679;' : '&#9675;'}</span>
+            <div>
+                <div style="font-family:var(--font-display);font-size:14px;letter-spacing:1px;color:${enabled ? 'var(--accent-green)' : 'var(--accent-amber)'}">
+                    AGENT BRAIN ${enabled ? 'ONLINE' : 'STANDBY'}</div>
+                <div style="font-size:11px;color:var(--text-dim)">
+                    ${enabled ? 'Autonomous mode \u2014 making independent decisions' : 'Enable: AGENT_ENABLED=true in .env, then run --agent'}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-2"><div class="card-roman p-3 text-center">
+            <div style="font-size:24px;font-family:var(--font-display);color:var(--accent-gold)">${(s.min_confidence||0.6).toFixed(2)}</div>
+            <div class="stat-label">Min Confidence</div>
+        </div></div>
+        <div class="col-md-2"><div class="card-roman p-3 text-center">
+            <div style="font-size:24px;font-family:var(--font-display);color:var(--accent-gold)">${s.consensus_threshold||2}</div>
+            <div class="stat-label">Consensus Req</div>
+        </div></div>
+        <div class="col-md-2"><div class="card-roman p-3 text-center">
+            <div style="font-size:24px;font-family:var(--font-display);color:var(--accent-gold)">${(s.position_scale||1.0).toFixed(1)}x</div>
+            <div class="stat-label">Position Scale</div>
+        </div></div>
+        <div class="col-md-2"><div class="card-roman p-3 text-center">
+            <div style="font-size:24px;font-family:var(--font-display);color:var(--accent-green)">${winRate}%</div>
+            <div class="stat-label">Win Rate</div>
+        </div></div>
+        <div class="col-md-2"><div class="card-roman p-3 text-center">
+            <div style="font-size:24px;font-family:var(--font-display);color:${(s.total_pnl_sol||0)>=0?'var(--accent-green)':'var(--accent-red)'}">${(s.total_pnl_sol||0).toFixed(4)}</div>
+            <div class="stat-label">Total PnL (SOL)</div>
+        </div></div>
+        <div class="col-md-2"><div class="card-roman p-3 text-center">
+            <div style="font-size:24px;font-family:var(--font-display);color:var(--accent-gold)">${s.learning_cycles||0}</div>
+            <div class="stat-label">Learn Cycles</div>
+        </div></div>
+    </div>
+
+    <!-- Performance + Learning -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6"><div class="card-roman p-3">
+            <h6 style="font-family:var(--font-display);color:var(--accent-gold);letter-spacing:1px;margin-bottom:12px">PERFORMANCE</h6>
+            <div class="row text-center">
+                <div class="col-4"><div style="font-size:20px;font-weight:600;color:var(--accent-green)">${s.wins||0}</div><div class="stat-label">Wins</div></div>
+                <div class="col-4"><div style="font-size:20px;font-weight:600;color:var(--accent-red)">${s.losses||0}</div><div class="stat-label">Losses</div></div>
+                <div class="col-4"><div style="font-size:20px;font-weight:600;color:var(--text-primary)">${s.total_decisions||0}</div><div class="stat-label">Decisions</div></div>
+            </div>
+            <hr style="border-color:var(--border-light);margin:12px 0">
+            <div class="row text-center">
+                <div class="col-4"><div style="font-size:14px;color:var(--accent-green)">${(s.best_trade_sol||0).toFixed(4)}</div><div class="stat-label">Best Trade</div></div>
+                <div class="col-4"><div style="font-size:14px;color:var(--accent-red)">${(s.worst_trade_sol||0).toFixed(4)}</div><div class="stat-label">Worst Trade</div></div>
+                <div class="col-4"><div style="font-size:14px;color:var(--text-primary)">${s.trusted_wallets||0}</div><div class="stat-label">Trust Adjusted</div></div>
+            </div>
+        </div></div>
+        <div class="col-md-6"><div class="card-roman p-3">
+            <h6 style="font-family:var(--font-display);color:var(--accent-gold);letter-spacing:1px;margin-bottom:12px">LEARNING INSIGHTS</h6>
+            <div style="font-size:13px;line-height:1.8">
+                <div><span style="color:var(--text-dim)">Confidence threshold:</span> <strong>${(s.min_confidence||0.6).toFixed(2)}</strong> <span style="color:var(--text-dim)">(auto-adjusts)</span></div>
+                <div><span style="color:var(--text-dim)">Position multiplier:</span> <strong>${(s.position_scale||1.0).toFixed(1)}x</strong> <span style="color:var(--text-dim)">(scales with win rate)</span></div>
+                <div><span style="color:var(--text-dim)">Wallets trust-adjusted:</span> <strong>${s.trusted_wallets||0}</strong></div>
+                <div><span style="color:var(--text-dim)">Tokens blacklisted:</span> <strong>${s.blacklisted_tokens||0}</strong></div>
+                <div><span style="color:var(--text-dim)">Learning cycles:</span> <strong>${s.learning_cycles||0}</strong></div>
+            </div>
+        </div></div>
+    </div>
+
+    <!-- Decision Journal -->
+    <div class="card-roman p-3">
+        <h6 style="font-family:var(--font-display);color:var(--accent-gold);letter-spacing:1px;margin-bottom:12px">DECISION JOURNAL</h6>`;
+
+    if (decisions.length === 0) {
+        html += `<div class="text-center py-4" style="color:var(--text-dim)">
+            <p style="font-family:var(--font-serif);font-size:16px">No decisions recorded yet</p>
+            <p style="font-size:12px">Run the agent to start logging decisions:</p>
+            <code style="background:var(--bg-secondary);padding:6px 12px;border-radius:4px;font-size:12px">python main.py --agent --dry-run</code>
+        </div>`;
+    } else {
+        html += `<div class="table-responsive"><table class="table-roman"><thead><tr>
+            <th>Time</th><th>Token</th><th>Decision</th><th class="text-end">Confidence</th>
+            <th class="text-end">Wallets</th><th class="text-end">Amount</th><th>Reasons</th><th class="text-end">Outcome</th>
+        </tr></thead><tbody>`;
+
+        const dColors = {buy:'var(--accent-green)',sell:'var(--accent-red)',hold:'var(--accent-amber)',skip:'var(--text-dim)'};
+        decisions.forEach(d => {
+            const time = d.created_at ? new Date(d.created_at).toLocaleString() : '\u2014';
+            const sym = d.token_symbol || (d.token_mint?d.token_mint.slice(0,8):'\u2014');
+            const dec = d.decision || '\u2014';
+            const conf = d.confidence!=null ? (d.confidence*100).toFixed(0)+'%' : '\u2014';
+            const wc = d.wallets_buying || 0;
+            const amt = d.amount_sol ? d.amount_sol.toFixed(4)+' SOL' : '\u2014';
+            const reasons = Array.isArray(d.reasons) ? d.reasons.join(', ') : '\u2014';
+            const pnl = d.outcome_pnl_sol;
+            const pStr = pnl!=null ? (pnl>=0?'+':'')+pnl.toFixed(4) : '\u2014';
+            const pCol = pnl!=null ? (pnl>=0?'var(--accent-green)':'var(--accent-red)') : 'var(--text-dim)';
+
+            html += `<tr>
+                <td style="font-size:11px;color:var(--text-dim);white-space:nowrap">${time}</td>
+                <td style="font-family:monospace;font-weight:600">${sym}</td>
+                <td><span style="color:${dColors[dec]||'var(--text-dim)'};font-weight:600;text-transform:uppercase">${dec}</span></td>
+                <td class="text-end">${conf}</td>
+                <td class="text-end">${wc}</td>
+                <td class="text-end" style="font-family:monospace">${amt}</td>
+                <td style="font-size:11px;color:var(--text-dim);max-width:200px;overflow:hidden;text-overflow:ellipsis">${reasons}</td>
+                <td class="text-end" style="color:${pCol};font-weight:500">${pStr}</td>
+            </tr>`;
+        });
+        html += '</tbody></table></div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
     updateRefreshTimer();
 }
 
