@@ -47,10 +47,33 @@ DB_PATH = settings.db_path
 
 
 async def get_db() -> aiosqlite.Connection:
-    """Open a read-only database connection."""
+    """Open a database connection."""
     conn = await aiosqlite.connect(DB_PATH)
     conn.row_factory = aiosqlite.Row
     return conn
+
+
+@app.on_event("startup")
+async def run_db_migrations():
+    """Ensure new columns exist in existing databases."""
+    conn = await aiosqlite.connect(DB_PATH)
+    migrations = [
+        ("wallets", "win_rate", "REAL DEFAULT 0"),
+        ("wallets", "gmgn_realized_profit_usd", "REAL DEFAULT 0"),
+        ("wallets", "gmgn_profit_30d_usd", "REAL DEFAULT 0"),
+        ("wallets", "gmgn_sol_balance", "REAL DEFAULT 0"),
+        ("wallets", "gmgn_winrate", "REAL"),
+        ("wallets", "gmgn_buy_30d", "INTEGER DEFAULT 0"),
+        ("wallets", "gmgn_sell_30d", "INTEGER DEFAULT 0"),
+        ("wallets", "gmgn_tags", "TEXT"),
+    ]
+    for table, column, col_type in migrations:
+        try:
+            await conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+        except Exception:
+            pass  # Column already exists
+    await conn.commit()
+    await conn.close()
 
 
 # =========================================================================
@@ -154,14 +177,16 @@ async def api_overview():
 
 @app.get("/api/wallets")
 async def api_wallets():
-    """All scored wallets, sorted by score."""
+    """All scored wallets, sorted by score — includes GMGN enrichment data."""
     db = await get_db()
     try:
         cursor = await db.execute(
             """SELECT address, total_score, pnl_score, win_rate_score, timing_score,
                       consistency_score, total_pnl_sol, total_trades, winning_trades,
-                      avg_entry_rank, unique_winners, is_flagged, flag_reason,
-                      is_monitored, last_active
+                      win_rate, avg_entry_rank, unique_winners,
+                      gmgn_realized_profit_usd, gmgn_profit_30d_usd, gmgn_sol_balance,
+                      gmgn_winrate, gmgn_buy_30d, gmgn_sell_30d, gmgn_tags,
+                      is_flagged, flag_reason, is_monitored, last_active
                FROM wallets WHERE total_score > 0
                ORDER BY total_score DESC LIMIT 200"""
         )
@@ -169,8 +194,16 @@ async def api_wallets():
         wallets = []
         for w in rows:
             d = dict(w)
-            total = d.get("total_trades") or 0
-            d["win_rate"] = (d.get("winning_trades") or 0) / total * 100 if total > 0 else 0
+            # Parse tags from JSON string back to list
+            tags_raw = d.get("gmgn_tags") or "[]"
+            try:
+                d["gmgn_tags"] = json.loads(tags_raw) if isinstance(tags_raw, str) else tags_raw
+            except (json.JSONDecodeError, TypeError):
+                d["gmgn_tags"] = []
+            # Use stored win_rate if available, else calculate from winning_trades
+            if not d.get("win_rate"):
+                total = d.get("total_trades") or 0
+                d["win_rate"] = (d.get("winning_trades") or 0) / total * 100 if total > 0 else 0
             wallets.append(d)
         return {"wallets": wallets}
     finally:
@@ -256,12 +289,14 @@ async def api_wallet_detail(address: str):
     """Detailed info for a single wallet: scores, token trades, copy trades."""
     db = await get_db()
     try:
-        # Wallet record
+        # Wallet record (includes GMGN enrichment fields)
         cursor = await db.execute(
             """SELECT address, total_score, pnl_score, win_rate_score, timing_score,
                       consistency_score, total_pnl_sol, total_trades, winning_trades,
-                      avg_entry_rank, unique_winners, is_flagged, flag_reason,
-                      is_monitored, first_seen, last_active, score_updated_at
+                      win_rate, avg_entry_rank, unique_winners,
+                      gmgn_realized_profit_usd, gmgn_profit_30d_usd, gmgn_sol_balance,
+                      gmgn_winrate, gmgn_buy_30d, gmgn_sell_30d, gmgn_tags,
+                      is_flagged, flag_reason, is_monitored, first_seen, last_active, score_updated_at
                FROM wallets WHERE address = ?""",
             (address,),
         )
@@ -269,8 +304,16 @@ async def api_wallet_detail(address: str):
         if not row:
             raise HTTPException(status_code=404, detail="Wallet not found")
         wallet = dict(row)
-        total = wallet.get("total_trades") or 0
-        wallet["win_rate"] = (wallet.get("winning_trades") or 0) / total * 100 if total > 0 else 0
+        # Parse tags
+        tags_raw = wallet.get("gmgn_tags") or "[]"
+        try:
+            wallet["gmgn_tags"] = json.loads(tags_raw) if isinstance(tags_raw, str) else tags_raw
+        except (json.JSONDecodeError, TypeError):
+            wallet["gmgn_tags"] = []
+        # Use stored win_rate if available
+        if not wallet.get("win_rate"):
+            total = wallet.get("total_trades") or 0
+            wallet["win_rate"] = (wallet.get("winning_trades") or 0) / total * 100 if total > 0 else 0
 
         # Token trades by this wallet
         cursor = await db.execute(

@@ -72,9 +72,21 @@ class AnomalyDetector:
 
         return scored_wallets
 
+    # GMGN tags that indicate bots/scammers we should NOT copy trade
+    BAD_TAGS = {
+        "sandwich_bot",     # MEV sandwich attacker — impossible to replicate
+        "scammer",          # Known scammer wallet
+        "rug_deployer",     # Has deployed rugs
+    }
+
     def _check_all_patterns(self, wallet: dict, trades: list[dict]) -> list[str]:
         """Run all anomaly checks on a single wallet. Returns list of flag reasons."""
         flags = []
+
+        # Check 0: GMGN tag-based flagging (most reliable — GMGN tracks these)
+        flag = self._check_gmgn_tags(wallet)
+        if flag:
+            flags.append(flag)
 
         # Check 1: Unrealistic win rate
         flag = self._check_win_rate(wallet)
@@ -97,6 +109,28 @@ class AnomalyDetector:
             flags.append(flag)
 
         return flags
+
+    def _check_gmgn_tags(self, wallet: dict) -> str | None:
+        """
+        Flag wallets with known-bad GMGN tags.
+
+        GMGN labels wallets based on their on-chain behavior.
+        Sandwich bots and scammers are tagged automatically.
+        We can't profitably copy these — their strategies require
+        MEV infrastructure or are outright malicious.
+        """
+        tags = wallet.get("gmgn_tags") or []
+        if isinstance(tags, str):
+            import json
+            try:
+                tags = json.loads(tags)
+            except (json.JSONDecodeError, TypeError):
+                tags = []
+
+        bad_found = [t for t in tags if t in self.BAD_TAGS]
+        if bad_found:
+            return f"GMGN flagged: {', '.join(bad_found)}"
+        return None
 
     def _check_win_rate(self, wallet: dict) -> str | None:
         """

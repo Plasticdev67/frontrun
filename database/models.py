@@ -68,8 +68,18 @@ CREATE TABLE IF NOT EXISTS wallets (
     total_pnl_sol REAL DEFAULT 0,          -- Total profit/loss in SOL
     total_trades INTEGER DEFAULT 0,        -- Total number of trades analyzed
     winning_trades INTEGER DEFAULT 0,      -- Number of profitable trades
+    win_rate REAL DEFAULT 0,               -- Win rate as 0-100 percentage
     avg_entry_rank INTEGER DEFAULT 0,      -- Average position among first buyers (lower = earlier)
     unique_winners INTEGER DEFAULT 0,      -- Number of different winning tokens traded
+
+    -- GMGN enrichment data (the real alpha)
+    gmgn_realized_profit_usd REAL DEFAULT 0,   -- All-time realized profit in USD
+    gmgn_profit_30d_usd REAL DEFAULT 0,        -- 30-day realized profit in USD
+    gmgn_sol_balance REAL DEFAULT 0,            -- Current SOL balance
+    gmgn_winrate REAL,                          -- GMGN-reported win rate (0-1 scale, NULL if unknown)
+    gmgn_buy_30d INTEGER DEFAULT 0,             -- Number of buys in last 30 days
+    gmgn_sell_30d INTEGER DEFAULT 0,            -- Number of sells in last 30 days
+    gmgn_tags TEXT,                              -- JSON array of tags: smart_degen, sniper, whale, etc.
 
     -- Flags
     is_flagged BOOLEAN DEFAULT FALSE,      -- True if this wallet looks suspicious

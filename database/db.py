@@ -59,7 +59,31 @@ class Database:
         await self.connection.executescript(CREATE_TABLES_SQL)
         await self.connection.commit()
 
+        # Migrate existing databases — add new columns if they don't exist yet
+        await self._run_migrations()
+
         logger.info("database_initialized", path=self.db_path)
+
+    async def _run_migrations(self) -> None:
+        """Add new columns to existing tables. Safe to run multiple times."""
+        migrations = [
+            ("wallets", "win_rate", "REAL DEFAULT 0"),
+            ("wallets", "gmgn_realized_profit_usd", "REAL DEFAULT 0"),
+            ("wallets", "gmgn_profit_30d_usd", "REAL DEFAULT 0"),
+            ("wallets", "gmgn_sol_balance", "REAL DEFAULT 0"),
+            ("wallets", "gmgn_winrate", "REAL"),
+            ("wallets", "gmgn_buy_30d", "INTEGER DEFAULT 0"),
+            ("wallets", "gmgn_sell_30d", "INTEGER DEFAULT 0"),
+            ("wallets", "gmgn_tags", "TEXT"),
+        ]
+        for table, column, col_type in migrations:
+            try:
+                await self.connection.execute(
+                    f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"
+                )
+            except Exception:
+                pass  # Column already exists — that's fine
+        await self.connection.commit()
 
     async def close(self) -> None:
         """Close the database connection cleanly."""
@@ -138,14 +162,19 @@ class Database:
         """
         Insert or update a wallet record.
         'Upsert' means: insert if new, update if it already exists.
+        Stores both scoring data and GMGN enrichment data.
         """
+        import json
+
         sql = """
             INSERT INTO wallets (
                 address, total_score, pnl_score, win_rate_score, timing_score,
                 consistency_score, total_pnl_sol, total_trades, winning_trades,
-                avg_entry_rank, unique_winners, is_flagged, flag_reason,
-                is_monitored, last_active, score_updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                win_rate, avg_entry_rank, unique_winners,
+                gmgn_realized_profit_usd, gmgn_profit_30d_usd, gmgn_sol_balance,
+                gmgn_winrate, gmgn_buy_30d, gmgn_sell_30d, gmgn_tags,
+                is_flagged, flag_reason, is_monitored, last_active, score_updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(address) DO UPDATE SET
                 total_score = excluded.total_score,
                 pnl_score = excluded.pnl_score,
@@ -155,8 +184,16 @@ class Database:
                 total_pnl_sol = excluded.total_pnl_sol,
                 total_trades = excluded.total_trades,
                 winning_trades = excluded.winning_trades,
+                win_rate = excluded.win_rate,
                 avg_entry_rank = excluded.avg_entry_rank,
                 unique_winners = excluded.unique_winners,
+                gmgn_realized_profit_usd = excluded.gmgn_realized_profit_usd,
+                gmgn_profit_30d_usd = excluded.gmgn_profit_30d_usd,
+                gmgn_sol_balance = excluded.gmgn_sol_balance,
+                gmgn_winrate = excluded.gmgn_winrate,
+                gmgn_buy_30d = excluded.gmgn_buy_30d,
+                gmgn_sell_30d = excluded.gmgn_sell_30d,
+                gmgn_tags = excluded.gmgn_tags,
                 is_flagged = excluded.is_flagged,
                 flag_reason = excluded.flag_reason,
                 is_monitored = excluded.is_monitored,
@@ -164,6 +201,11 @@ class Database:
                 score_updated_at = excluded.score_updated_at
         """
         now = datetime.now(timezone.utc).isoformat()
+
+        # Serialize tags list to JSON string for storage
+        gmgn_tags = wallet_data.get("gmgn_tags") or []
+        tags_json = json.dumps(gmgn_tags) if isinstance(gmgn_tags, list) else "[]"
+
         cursor = await self.connection.execute(sql, (
             wallet_data["address"],
             wallet_data.get("total_score", 0),
@@ -174,8 +216,16 @@ class Database:
             wallet_data.get("total_pnl_sol", 0),
             wallet_data.get("total_trades", 0),
             wallet_data.get("winning_trades", 0),
+            wallet_data.get("win_rate", 0),
             wallet_data.get("avg_entry_rank", 0),
             wallet_data.get("unique_winners", 0),
+            wallet_data.get("gmgn_realized_profit_usd", 0),
+            wallet_data.get("gmgn_profit_30d_usd", 0),
+            wallet_data.get("gmgn_sol_balance", 0),
+            wallet_data.get("gmgn_winrate"),
+            wallet_data.get("gmgn_buy_30d", 0),
+            wallet_data.get("gmgn_sell_30d", 0),
+            tags_json,
             wallet_data.get("is_flagged", False),
             wallet_data.get("flag_reason"),
             wallet_data.get("is_monitored", False),

@@ -140,9 +140,10 @@ class WalletScorer:
         elif gmgn_profit > 0:
             effective_pnl = gmgn_profit / 150
 
-        # If GMGN has win rate, use it
+        # If GMGN has win rate, use it (GMGN winrate is 0-1 decimal)
         effective_win_rate = win_rate
         effective_total_trades = total_trades
+        gmgn_sell_30d = int(_float(trades[0].get("gmgn_sell_30d")))
         if gmgn_winrate is not None:
             try:
                 effective_win_rate = float(gmgn_winrate)
@@ -152,6 +153,9 @@ class WalletScorer:
         # If GMGN shows high trade volume, boost the trade count
         if gmgn_buy_30d > effective_total_trades:
             effective_total_trades = gmgn_buy_30d
+
+        # Store win rate as a 0-100 percentage for display
+        win_rate_pct = round(effective_win_rate * 100, 1) if effective_win_rate <= 1 else round(effective_win_rate, 1)
 
         # Calculate individual dimension scores
         pnl_score = self._score_pnl(effective_pnl)
@@ -171,11 +175,16 @@ class WalletScorer:
             "total_pnl_sol": round(effective_pnl, 4),
             "total_trades": effective_total_trades,
             "winning_trades": winning_trades,
+            "win_rate": win_rate_pct,
             "avg_entry_rank": int(avg_entry_rank),
             "unique_winners": unique_winners,
+            # GMGN enrichment — stored in DB for dashboard display
             "gmgn_realized_profit_usd": round(gmgn_profit, 2),
             "gmgn_profit_30d_usd": round(gmgn_profit_30d, 2),
             "gmgn_sol_balance": round(gmgn_sol_balance, 2),
+            "gmgn_winrate": _float(gmgn_winrate) if gmgn_winrate is not None else None,
+            "gmgn_buy_30d": gmgn_buy_30d,
+            "gmgn_sell_30d": gmgn_sell_30d,
             "gmgn_tags": gmgn_tags,
             "is_flagged": False,
             "flag_reason": None,

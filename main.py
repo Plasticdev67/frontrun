@@ -170,6 +170,15 @@ async def main() -> None:
             detector = AnomalyDetector(settings)
             scored_wallets = detector.analyze(scored_wallets, wallet_data)
 
+            # Save flags back to DB (anomaly detector modifies in memory only)
+            flagged_count = 0
+            for w in scored_wallets:
+                if w.get("is_flagged"):
+                    await db.upsert_wallet(w)
+                    flagged_count += 1
+            if flagged_count:
+                logger.info("flags_saved_to_db", count=flagged_count)
+
             # Step 5: Auto-select the best clean wallets for monitoring
             monitored = await scorer.auto_select_monitored_wallets(
                 [w for w in scored_wallets if not w.get("is_flagged")]
