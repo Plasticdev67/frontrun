@@ -108,6 +108,11 @@ class AnomalyDetector:
         if flag:
             flags.append(flag)
 
+        # Check 5: GMGN-reported trade volume is bot-level (>15K buys in 30d)
+        flag = self._check_gmgn_trade_volume(wallet)
+        if flag:
+            flags.append(flag)
+
         return flags
 
     def _check_gmgn_tags(self, wallet: dict) -> str | None:
@@ -226,5 +231,30 @@ class AnomalyDetector:
         # (This is a simplified check — in production we'd look at actual timestamps)
         if len(trades) >= 20:
             return f"High-frequency trading: {len(trades)} trades detected (likely bot)"
+
+        return None
+
+    def _check_gmgn_trade_volume(self, wallet: dict) -> str | None:
+        """
+        Flag wallets with extreme GMGN-reported trade volume.
+
+        A real human trader doing research, finding alpha, and managing
+        positions might do 10-50 trades per day MAX. Anything over
+        500 trades/day (15,000/month) is automated.
+
+        991,000 trades in 30 days = ~33,000/day = definitely a bot.
+        """
+        gmgn_buy_30d = wallet.get("gmgn_buy_30d") or 0
+        gmgn_sell_30d = wallet.get("gmgn_sell_30d") or 0
+
+        try:
+            total_30d = int(gmgn_buy_30d) + int(gmgn_sell_30d)
+        except (ValueError, TypeError):
+            return None
+
+        # >15,000 trades in 30 days = 500+/day = automated trading
+        if total_30d > 15_000:
+            daily_avg = total_30d // 30
+            return f"Bot-level volume: {total_30d:,} trades in 30d (~{daily_avg:,}/day)"
 
         return None

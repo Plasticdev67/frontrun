@@ -242,6 +242,40 @@ class Settings:
     )
 
     # =========================================================================
+    # Smart Money Import Filters (used by --import-smart-money)
+    # =========================================================================
+
+    # Minimum 30-day realized profit in USD — filters out degens and losers
+    sm_min_profit_30d_usd: float = field(
+        default_factory=lambda: _get_env_float("SM_MIN_PROFIT_30D_USD", 1000.0)
+    )
+
+    # Minimum GMGN winrate (0-1 scale, 0.4 = 40% wins)
+    sm_min_winrate: float = field(
+        default_factory=lambda: _get_env_float("SM_MIN_WINRATE", 0.4)
+    )
+
+    # Minimum buys in last 30 days — must be actively trading
+    sm_min_buys_30d: int = field(
+        default_factory=lambda: _get_env_int("SM_MIN_BUYS_30D", 5)
+    )
+
+    # Maximum buys in last 30 days — anything over 15K is a bot
+    sm_max_buys_30d: int = field(
+        default_factory=lambda: _get_env_int("SM_MAX_BUYS_30D", 15000)
+    )
+
+    # Minimum SOL balance — must have funds to trade with
+    sm_min_sol_balance: float = field(
+        default_factory=lambda: _get_env_float("SM_MIN_SOL_BALANCE", 0.5)
+    )
+
+    # Auto-monitor the top N wallets by 30D profit after import
+    sm_auto_monitor_top: int = field(
+        default_factory=lambda: _get_env_int("SM_AUTO_MONITOR_TOP", 20)
+    )
+
+    # =========================================================================
     # System
     # =========================================================================
 

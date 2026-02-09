@@ -66,6 +66,7 @@ async def run_db_migrations():
         ("wallets", "gmgn_buy_30d", "INTEGER DEFAULT 0"),
         ("wallets", "gmgn_sell_30d", "INTEGER DEFAULT 0"),
         ("wallets", "gmgn_tags", "TEXT"),
+        ("wallets", "source", "TEXT DEFAULT 'manual'"),
     ]
     for table, column, col_type in migrations:
         try:
@@ -508,6 +509,344 @@ async def api_clusters():
             "total_clusters": len(clusters),
             "total_side_wallets": side_wallet_count,
         }
+    finally:
+        await db.close()
+
+
+# =========================================================================
+# NEW API Routes — Dashboard Rebuild (4-tab layout)
+# =========================================================================
+
+@app.get("/api/command_center")
+async def api_command_center():
+    """Command Center: our PnL, active positions, recent signals, quick stats."""
+    db = await get_db()
+    try:
+        # --- PnL Summary ---
+        # All-time realized PnL
+        cursor = await db.execute(
+            "SELECT COALESCE(SUM(realized_pnl_sol), 0) as total FROM positions WHERE status = 'closed'"
+        )
+        row = await cursor.fetchone()
+        pnl_all_time = float(row["total"]) if row else 0
+
+        # Today's PnL
+        cursor = await db.execute(
+            """SELECT COALESCE(SUM(CASE WHEN side='sell' THEN amount_sol
+                                        WHEN side='buy' THEN -amount_sol ELSE 0 END), 0) as pnl
+               FROM trades WHERE date(created_at) = date('now') AND status IN ('confirmed', 'dry_run')"""
+        )
+        row = await cursor.fetchone()
+        pnl_today = float(row["pnl"]) if row else 0
+
+        # 7d PnL
+        cursor = await db.execute(
+            "SELECT COALESCE(SUM(total_pnl_sol), 0) as total FROM daily_stats WHERE date >= date('now', '-7 days')"
+        )
+        row = await cursor.fetchone()
+        pnl_7d = float(row["total"]) if row else 0
+
+        # 30d PnL
+        cursor = await db.execute(
+            "SELECT COALESCE(SUM(total_pnl_sol), 0) as total FROM daily_stats WHERE date >= date('now', '-30 days')"
+        )
+        row = await cursor.fetchone()
+        pnl_30d = float(row["total"]) if row else 0
+
+        # --- Quick Stats ---
+        cursor = await db.execute(
+            "SELECT COALESCE(SUM(amount_sol_invested), 0) as total FROM positions WHERE status = 'open'"
+        )
+        row = await cursor.fetchone()
+        total_invested = float(row["total"]) if row else 0
+
+        # Our win rate
+        cursor = await db.execute(
+            """SELECT COUNT(*) as total,
+                      COALESCE(SUM(CASE WHEN realized_pnl_sol > 0 THEN 1 ELSE 0 END), 0) as wins
+               FROM positions WHERE status = 'closed'"""
+        )
+        row = await cursor.fetchone()
+        total_closed = row["total"] if row else 0
+        wins = row["wins"] if row else 0
+        our_win_rate = round(wins / total_closed * 100, 1) if total_closed > 0 else 0
+
+        # Best/worst trade
+        cursor = await db.execute(
+            "SELECT MAX(realized_pnl_sol) as best, MIN(realized_pnl_sol) as worst FROM positions WHERE status = 'closed'"
+        )
+        row = await cursor.fetchone()
+        best_trade = float(row["best"]) if row and row["best"] else 0
+        worst_trade = float(row["worst"]) if row and row["worst"] else 0
+
+        # Monitored wallets count
+        cursor = await db.execute("SELECT COUNT(*) as count FROM wallets WHERE is_monitored = TRUE")
+        row = await cursor.fetchone()
+        monitored_wallets = row["count"] if row else 0
+
+        # --- Active Positions ---
+        cursor = await db.execute(
+            """SELECT token_mint, token_symbol, entry_price_usd, current_price_usd,
+                      amount_sol_invested, amount_tokens_held, unrealized_pnl_sol,
+                      triggered_by_wallet, opened_at
+               FROM positions WHERE status = 'open' ORDER BY opened_at DESC"""
+        )
+        positions = []
+        for p in await cursor.fetchall():
+            d = dict(p)
+            entry = d.get("entry_price_usd") or 0
+            current = d.get("current_price_usd") or 0
+            d["multiplier"] = round(current / entry, 2) if entry > 0 and current > 0 else None
+            positions.append(d)
+
+        # --- Recent Signals ---
+        cursor = await db.execute(
+            """SELECT s.*, w.total_score as wallet_total_score
+               FROM signals s
+               LEFT JOIN wallets w ON s.wallet_address = w.address
+               ORDER BY s.created_at DESC LIMIT 5"""
+        )
+        signals = [dict(r) for r in await cursor.fetchall()]
+
+        return {
+            "pnl": {
+                "today": pnl_today,
+                "7d": pnl_7d,
+                "30d": pnl_30d,
+                "all_time": pnl_all_time,
+            },
+            "stats": {
+                "total_invested": total_invested,
+                "win_rate": our_win_rate,
+                "best_trade": best_trade,
+                "worst_trade": worst_trade,
+                "monitored_wallets": monitored_wallets,
+            },
+            "active_positions": positions,
+            "recent_signals": signals,
+            "trading_mode": settings.trading_mode,
+            "trading_paused": settings.trading_paused,
+        }
+    finally:
+        await db.close()
+
+
+@app.get("/api/smart_money")
+async def api_smart_money():
+    """Smart Money: wallets with cluster/side-wallet data and our copy PnL."""
+    db = await get_db()
+    try:
+        # 1. Get top unflagged wallets
+        cursor = await db.execute(
+            """SELECT address, total_score, pnl_score, win_rate_score, timing_score,
+                      consistency_score, total_pnl_sol, total_trades, winning_trades,
+                      win_rate, avg_entry_rank, unique_winners,
+                      gmgn_realized_profit_usd, gmgn_profit_30d_usd, gmgn_sol_balance,
+                      gmgn_winrate, gmgn_buy_30d, gmgn_sell_30d, gmgn_tags,
+                      source, is_flagged, flag_reason, is_monitored, last_active
+               FROM wallets WHERE total_score > 0
+               ORDER BY total_score DESC LIMIT 100"""
+        )
+        wallets = []
+        for w in await cursor.fetchall():
+            d = dict(w)
+            tags_raw = d.get("gmgn_tags") or "[]"
+            try:
+                d["gmgn_tags"] = json.loads(tags_raw) if isinstance(tags_raw, str) else tags_raw
+            except (json.JSONDecodeError, TypeError):
+                d["gmgn_tags"] = []
+            if not d.get("win_rate"):
+                total = d.get("total_trades") or 0
+                d["win_rate"] = (d.get("winning_trades") or 0) / total * 100 if total > 0 else 0
+            wallets.append(d)
+
+        # 2. Pre-fetch all clusters (batch, avoid N+1)
+        cursor = await db.execute("SELECT * FROM wallet_clusters")
+        clusters_by_seed = {}
+        for c in await cursor.fetchall():
+            clusters_by_seed[c["seed_wallet"]] = dict(c)
+
+        # 3. Pre-fetch all cluster members
+        cursor = await db.execute(
+            """SELECT wcm.*, w.total_score, w.is_monitored
+               FROM wallet_cluster_members wcm
+               LEFT JOIN wallets w ON wcm.wallet_address = w.address
+               ORDER BY wcm.confidence DESC"""
+        )
+        from collections import defaultdict
+        members_by_cluster = defaultdict(list)
+        for m in await cursor.fetchall():
+            members_by_cluster[m["cluster_id"]].append(dict(m))
+
+        # 4. Pre-fetch our copy PnL per wallet (batch)
+        cursor = await db.execute(
+            """SELECT triggered_by_wallet,
+                      COALESCE(SUM(CASE WHEN status='closed' THEN realized_pnl_sol ELSE 0 END), 0) as realized,
+                      COALESCE(SUM(CASE WHEN status='open' THEN unrealized_pnl_sol ELSE 0 END), 0) as unrealized,
+                      COUNT(*) as trade_count
+               FROM positions
+               WHERE triggered_by_wallet IS NOT NULL
+               GROUP BY triggered_by_wallet"""
+        )
+        copy_pnl = {}
+        for r in await cursor.fetchall():
+            copy_pnl[r["triggered_by_wallet"]] = {
+                "pnl_sol": float(r["realized"]) + float(r["unrealized"]),
+                "trade_count": r["trade_count"],
+            }
+
+        # 5. Attach cluster data + copy PnL to each wallet
+        total_side_wallets = 0
+        for w in wallets:
+            cluster = clusters_by_seed.get(w["address"])
+            if cluster:
+                cid = cluster["id"]
+                side_wallets = [
+                    m for m in members_by_cluster.get(cid, [])
+                    if m.get("is_side_wallet")
+                ]
+                total_side_wallets += len(side_wallets)
+                w["cluster"] = {
+                    "id": cid,
+                    "total_members": cluster["total_members"],
+                    "best_side_wallet": cluster["best_side_wallet"],
+                    "avg_lead_time_seconds": cluster["avg_lead_time_seconds"],
+                    "side_wallets": side_wallets,
+                }
+            else:
+                w["cluster"] = None
+
+            cp = copy_pnl.get(w["address"])
+            w["our_copy_pnl_sol"] = cp["pnl_sol"] if cp else None
+            w["our_copy_trades"] = cp["trade_count"] if cp else 0
+
+        # Summary counts
+        monitored = sum(1 for w in wallets if w.get("is_monitored"))
+        clusters_found = sum(1 for w in wallets if w.get("cluster"))
+
+        return {
+            "wallets": wallets,
+            "total_monitored": monitored,
+            "total_clusters": clusters_found,
+            "total_side_wallets": total_side_wallets,
+        }
+    finally:
+        await db.close()
+
+
+@app.get("/api/signals")
+async def api_signals():
+    """Live Feed: recent signals with wallet context."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """SELECT s.id, s.wallet_address, s.token_mint, s.token_symbol,
+                      s.signal_type, s.wallet_score, s.confidence,
+                      s.executed, s.trade_id, s.skip_reason, s.created_at,
+                      w.total_score as wallet_total_score,
+                      w.win_rate as wallet_win_rate,
+                      w.gmgn_profit_30d_usd as wallet_profit_30d,
+                      w.gmgn_tags as wallet_tags
+               FROM signals s
+               LEFT JOIN wallets w ON s.wallet_address = w.address
+               ORDER BY s.created_at DESC LIMIT 100"""
+        )
+        signals = []
+        for r in await cursor.fetchall():
+            d = dict(r)
+            tags_raw = d.get("wallet_tags") or "[]"
+            try:
+                d["wallet_tags"] = json.loads(tags_raw) if isinstance(tags_raw, str) else tags_raw
+            except (json.JSONDecodeError, TypeError):
+                d["wallet_tags"] = []
+            signals.append(d)
+
+        # Today's summary
+        cursor = await db.execute(
+            """SELECT COUNT(*) as total,
+                      COALESCE(SUM(CASE WHEN executed = TRUE THEN 1 ELSE 0 END), 0) as copied,
+                      COALESCE(SUM(CASE WHEN skip_reason IS NOT NULL THEN 1 ELSE 0 END), 0) as skipped
+               FROM signals WHERE date(created_at) = date('now')"""
+        )
+        row = await cursor.fetchone()
+
+        return {
+            "signals": signals,
+            "today_total": row["total"] if row else 0,
+            "today_copied": row["copied"] if row else 0,
+            "today_skipped": row["skipped"] if row else 0,
+        }
+    finally:
+        await db.close()
+
+
+@app.get("/api/journal")
+async def api_journal():
+    """Journal: trade history with wallet context + performance by wallet."""
+    db = await get_db()
+    try:
+        # 1. All copy trades with context
+        cursor = await db.execute(
+            """SELECT t.id, t.token_mint, t.token_symbol, t.side, t.amount_sol,
+                      t.amount_tokens, t.price_usd, t.triggered_by_wallet,
+                      t.sell_reason, t.tx_signature, t.status, t.created_at,
+                      w.total_score as wallet_score
+               FROM trades t
+               LEFT JOIN wallets w ON t.triggered_by_wallet = w.address
+               WHERE t.status IN ('confirmed', 'dry_run')
+               ORDER BY t.created_at DESC LIMIT 200"""
+        )
+        trades = [dict(r) for r in await cursor.fetchall()]
+
+        # 2. Performance by wallet
+        cursor = await db.execute(
+            """SELECT triggered_by_wallet,
+                      COUNT(*) as total_trades,
+                      SUM(CASE WHEN side='buy' THEN 1 ELSE 0 END) as buys,
+                      SUM(CASE WHEN side='sell' THEN 1 ELSE 0 END) as sells,
+                      SUM(CASE WHEN side='sell' THEN amount_sol
+                                WHEN side='buy' THEN -amount_sol ELSE 0 END) as net_pnl
+               FROM trades
+               WHERE triggered_by_wallet IS NOT NULL
+                 AND status IN ('confirmed', 'dry_run')
+               GROUP BY triggered_by_wallet
+               ORDER BY net_pnl DESC"""
+        )
+        wallet_perf = []
+        for r in await cursor.fetchall():
+            d = dict(r)
+            d["net_pnl"] = float(d["net_pnl"]) if d["net_pnl"] else 0
+            wallet_perf.append(d)
+
+        # 3. Daily PnL (reuse same query)
+        cursor = await db.execute(
+            """SELECT date, trades_executed, positions_opened, positions_closed, total_pnl_sol
+               FROM daily_stats ORDER BY date ASC LIMIT 90"""
+        )
+        daily_pnl = [dict(r) for r in await cursor.fetchall()]
+
+        return {
+            "trades": trades,
+            "wallet_performance": wallet_perf,
+            "daily_pnl": daily_pnl,
+        }
+    finally:
+        await db.close()
+
+
+@app.post("/api/wallet/{address}/toggle_monitor")
+async def api_toggle_monitor(address: str):
+    """Toggle a wallet's monitored status (one-click copy list add/remove)."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT is_monitored FROM wallets WHERE address = ?", (address,))
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Wallet not found")
+        new_state = not row["is_monitored"]
+        await db.execute("UPDATE wallets SET is_monitored = ? WHERE address = ?", (new_state, address))
+        await db.commit()
+        return {"address": address, "is_monitored": new_state}
     finally:
         await db.close()
 

@@ -228,6 +228,213 @@ class GMGNClient:
 
         return stats
 
+    async def get_smart_money_wallets(
+        self,
+        min_profit_30d: float = 1000.0,
+        min_winrate: float = 0.4,
+        min_buys_30d: int = 5,
+        max_buys_30d: int = 15000,
+        min_sol_balance: float = 0.5,
+    ) -> list[dict]:
+        """
+        Find smart money wallets by scanning recent top tokens and filtering
+        their buyers through strict quality gates.
+
+        Strategy:
+        1. Try GMGN's smart money leaderboard endpoint (undocumented, may fail)
+        2. If that fails, use top tokens → top buyers → enrich → filter
+
+        Returns list of enriched wallet dicts that pass all filters.
+        """
+        BAD_TAGS = {"sandwich_bot", "scammer", "rug_deployer"}
+
+        # --- Attempt 1: Try the leaderboard endpoint directly ---
+        logger.info("smart_money_trying_leaderboard")
+        leaderboard_data = await self._get(
+            "/smartmoney/sol/walletNew",
+            params={"limit": "100", "orderby": "realized_profit_30d", "direction": "desc"},
+        )
+
+        leaderboard_wallets = []
+        if leaderboard_data:
+            # Try different response structures
+            raw = leaderboard_data.get("data", {})
+            if isinstance(raw, list):
+                leaderboard_wallets = raw
+            elif isinstance(raw, dict):
+                leaderboard_wallets = raw.get("rank", []) or raw.get("wallets", []) or raw.get("list", [])
+
+        if leaderboard_wallets:
+            logger.info("smart_money_leaderboard_hit", count=len(leaderboard_wallets))
+            # Leaderboard wallets likely already have stats — extract addresses and enrich
+            addresses = []
+            for w in leaderboard_wallets:
+                addr = w.get("wallet_address") or w.get("address") or w.get("walletAddress")
+                if addr:
+                    addresses.append(addr)
+            if addresses:
+                return await self._enrich_and_filter(
+                    addresses[:100], min_profit_30d, min_winrate,
+                    min_buys_30d, max_buys_30d, min_sol_balance, BAD_TAGS,
+                )
+
+        # --- Attempt 2: Token-buyers approach ---
+        logger.info("smart_money_using_token_buyers_approach")
+
+        # Get recent top-moving tokens across multiple timeframes
+        all_tokens = []
+        for tf in ["1h", "6h", "24h"]:
+            tokens = await self.get_top_tokens(tf, min_marketcap=100_000, min_liquidity=10_000)
+            all_tokens.extend(tokens)
+            await asyncio.sleep(0.5)
+
+        if not all_tokens:
+            logger.warning("smart_money_no_tokens_found")
+            return []
+
+        logger.info("smart_money_tokens_fetched", count=len(all_tokens))
+
+        # Deduplicate tokens by address
+        seen_tokens = set()
+        unique_tokens = []
+        for t in all_tokens:
+            addr = t.get("address") or t.get("mint") or t.get("token_address")
+            if addr and addr not in seen_tokens:
+                seen_tokens.add(addr)
+                unique_tokens.append(t)
+
+        # Cap at 30 tokens to keep API calls reasonable
+        unique_tokens = unique_tokens[:30]
+
+        # Get top buyers for each token
+        all_buyer_addresses = set()
+        for t in unique_tokens:
+            token_addr = t.get("address") or t.get("mint") or t.get("token_address")
+            if not token_addr:
+                continue
+            buyers = await self.get_top_buyers(token_addr)
+            for b in buyers:
+                addr = b.get("wallet_address") or b.get("address")
+                if addr:
+                    all_buyer_addresses.add(addr)
+            await asyncio.sleep(0.3)
+
+        logger.info("smart_money_unique_buyers", count=len(all_buyer_addresses))
+
+        if not all_buyer_addresses:
+            return []
+
+        # Cap at 200 wallets to enrich (each costs 1 API call)
+        buyer_list = list(all_buyer_addresses)[:200]
+
+        return await self._enrich_and_filter(
+            buyer_list, min_profit_30d, min_winrate,
+            min_buys_30d, max_buys_30d, min_sol_balance, BAD_TAGS,
+        )
+
+    async def _enrich_and_filter(
+        self,
+        addresses: list[str],
+        min_profit_30d: float,
+        min_winrate: float,
+        min_buys_30d: int,
+        max_buys_30d: int,
+        min_sol_balance: float,
+        bad_tags: set,
+    ) -> list[dict]:
+        """Enrich wallet addresses with stats and apply smart money filters."""
+
+        def _float(val, default=0.0):
+            """Safely convert GMGN value to float (handles strings, None)."""
+            if val is None:
+                return default
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return default
+
+        passed = []
+        total_checked = 0
+
+        for i, addr in enumerate(addresses):
+            stats = await self.get_wallet_stats(addr)
+            if not stats:
+                await asyncio.sleep(0.3)
+                continue
+
+            total_checked += 1
+
+            # Extract and safely convert all fields
+            profit_30d = _float(stats.get("realized_profit_30d"))
+            winrate = stats.get("winrate")  # Often None
+            buy_30d = int(_float(stats.get("buy_30d")))
+            sell_30d = int(_float(stats.get("sell_30d")))
+            sol_balance = _float(stats.get("sol_balance"))
+            tags = stats.get("tags") or []
+            if isinstance(tags, str):
+                try:
+                    import json
+                    tags = json.loads(tags)
+                except (json.JSONDecodeError, TypeError):
+                    tags = [tags] if tags else []
+
+            realized_profit = _float(stats.get("realized_profit"))
+
+            # --- Apply filters ---
+
+            # Filter 1: Must have profit data
+            if profit_30d <= 0 and realized_profit <= 0:
+                continue
+
+            # Filter 2: Minimum 30D profit
+            if profit_30d < min_profit_30d:
+                continue
+
+            # Filter 3: Winrate (skip check if NULL — many wallets don't have it)
+            if winrate is not None and _float(winrate) < min_winrate:
+                continue
+
+            # Filter 4: Activity range (not inactive, not a bot)
+            if buy_30d < min_buys_30d or buy_30d > max_buys_30d:
+                continue
+
+            # Filter 5: Has SOL to trade with
+            if sol_balance < min_sol_balance:
+                continue
+
+            # Filter 6: No bad tags
+            tag_set = set(t.lower().replace(" ", "_") for t in tags) if tags else set()
+            if tag_set & bad_tags:
+                continue
+
+            # Passed all filters — build wallet dict
+            passed.append({
+                "address": addr,
+                "gmgn_realized_profit_usd": realized_profit,
+                "gmgn_profit_30d_usd": profit_30d,
+                "gmgn_sol_balance": sol_balance,
+                "gmgn_winrate": _float(winrate) if winrate is not None else None,
+                "gmgn_buy_30d": buy_30d,
+                "gmgn_sell_30d": sell_30d,
+                "gmgn_tags": tags,
+            })
+
+            # Log progress every 50 wallets
+            if total_checked % 50 == 0:
+                logger.info("smart_money_progress", checked=total_checked, passed=len(passed))
+
+            await asyncio.sleep(0.5)  # Rate limiting
+
+        logger.info(
+            "smart_money_scan_complete",
+            total_checked=total_checked,
+            passed_filters=len(passed),
+        )
+
+        # Sort by 30D profit descending
+        passed.sort(key=lambda w: w.get("gmgn_profit_30d_usd", 0), reverse=True)
+        return passed
+
     async def get_token_info(self, token_address: str) -> dict:
         """
         Get detailed info for a single token.

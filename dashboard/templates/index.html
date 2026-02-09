@@ -832,6 +832,219 @@
             margin-top: 8px;
             font-family: var(--font-display);
         }
+
+        /* ========================================
+           PnL HERO — Command Center
+           ======================================== */
+        .pnl-hero {
+            text-align: center;
+            padding: 28px 20px !important;
+        }
+        .pnl-main {
+            font-family: var(--font-serif);
+            font-size: 2.8rem;
+            font-weight: 700;
+            margin: 8px 0 16px 0;
+        }
+        .pnl-period-row {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+        }
+
+        /* ========================================
+           SMART MONEY CARDS
+           ======================================== */
+        .smart-money-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow-card);
+            transition: box-shadow 0.3s ease, transform 0.25s ease;
+            overflow: hidden;
+        }
+        .smart-money-card:hover {
+            box-shadow: var(--shadow-card-hover);
+            transform: translateY(-1px);
+        }
+
+        /* Expand chevron for side wallets */
+        .expand-chevron {
+            display: inline-block;
+            font-size: 9px;
+            color: var(--text-dim);
+            margin-left: 6px;
+            transition: transform 0.3s ease;
+        }
+        .expand-chevron.open {
+            transform: rotate(90deg);
+        }
+
+        /* Side wallets section — collapsed by default */
+        .side-wallets-section {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease, padding 0.3s ease;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-light);
+            padding: 0 16px;
+        }
+        .side-wallets-section.expanded {
+            max-height: 500px;
+            padding: 12px 16px;
+        }
+
+        /* Side wallet row */
+        .side-wallet-row {
+            display: grid;
+            grid-template-columns: 14px 1fr 70px 70px 50px;
+            gap: 8px;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 12px;
+        }
+        .side-wallet-row:last-child {
+            border-bottom: none;
+        }
+
+        /* ========================================
+           SOURCE BADGES — FOMO / GMGN / MANUAL
+           ======================================== */
+        .badge-source {
+            display: inline-block;
+            font-family: var(--font-display);
+            font-size: 8px;
+            letter-spacing: 1.5px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+        .badge-source-fomo {
+            background: rgba(184, 150, 12, 0.15);
+            border: 1px solid var(--accent-gold);
+            color: var(--accent-gold);
+        }
+        .badge-source-gmgn {
+            background: rgba(45, 107, 63, 0.12);
+            border: 1px solid var(--accent-green);
+            color: var(--accent-green);
+        }
+        .badge-source-manual {
+            background: rgba(138, 128, 112, 0.1);
+            border: 1px solid var(--text-dim);
+            color: var(--text-dim);
+        }
+
+        /* ========================================
+           COPY TOGGLE BUTTON
+           ======================================== */
+        .btn-toggle-copy {
+            font-family: var(--font-display);
+            font-size: 9px;
+            letter-spacing: 2px;
+            padding: 5px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: transparent;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+        .btn-toggle-copy:hover {
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+        }
+        .btn-toggle-copy.active {
+            background: var(--accent-gold);
+            border-color: var(--accent-gold);
+            color: #fff;
+        }
+        .btn-toggle-copy.active:hover {
+            background: var(--accent-amber);
+            border-color: var(--accent-amber);
+        }
+
+        /* ========================================
+           PROFIT INDICATOR DOT
+           ======================================== */
+        .profit-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+        .profit-indicator.profitable {
+            background: var(--accent-green);
+            box-shadow: 0 0 4px rgba(45, 107, 63, 0.4);
+        }
+        .profit-indicator.unprofitable {
+            background: var(--accent-red);
+            box-shadow: 0 0 4px rgba(139, 44, 44, 0.4);
+        }
+        .profit-indicator.no-data {
+            background: var(--border-color);
+        }
+
+        /* ========================================
+           SIGNAL ROW — Live Feed
+           ======================================== */
+        .signal-row {
+            display: grid;
+            grid-template-columns: 70px 1fr 1fr auto;
+            gap: 12px;
+            align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s ease;
+        }
+        .signal-row:hover {
+            background: rgba(184, 150, 12, 0.04);
+        }
+        .signal-row:last-child {
+            border-bottom: none;
+        }
+
+        /* ========================================
+           RESPONSIVE — NEW COMPONENTS
+           ======================================== */
+        @media (max-width: 768px) {
+            .pnl-main { font-size: 2rem; }
+            .pnl-period-row { gap: 20px; }
+            .pnl-period-row > div div:last-child { font-size: 1rem !important; }
+
+            .smart-money-card > div:first-child {
+                padding: 10px 12px !important;
+                gap: 8px !important;
+            }
+            .side-wallet-row {
+                grid-template-columns: 14px 1fr 60px 60px 40px;
+                gap: 4px;
+                font-size: 11px;
+            }
+            .signal-row {
+                grid-template-columns: 1fr 1fr;
+                gap: 6px;
+                padding: 8px 12px;
+            }
+            .signal-row > div:first-child {
+                grid-column: 1 / -1;
+            }
+            .btn-toggle-copy {
+                font-size: 8px;
+                padding: 4px 8px;
+            }
+        }
+
+        @media (max-width: 375px) {
+            .pnl-main { font-size: 1.6rem; }
+            .pnl-period-row { flex-direction: column; gap: 8px; }
+        }
     </style>
 </head>
 <body>
@@ -900,37 +1113,27 @@
     <!-- Navigation -->
     <ul class="nav-roman" id="mainTabs">
         <li class="nav-item">
-            <a class="nav-link active" href="#" data-tab="overview">Overview</a>
+            <a class="nav-link active" href="#" data-tab="command">Command Center</a>
         </li>
         <li class="nav-separator">&#9670;</li>
         <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="wallets">Wallets</a>
+            <a class="nav-link" href="#" data-tab="smart-money">Smart Money</a>
         </li>
         <li class="nav-separator">&#9670;</li>
         <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="tokens">Tokens</a>
+            <a class="nav-link" href="#" data-tab="live-feed">Live Feed</a>
         </li>
         <li class="nav-separator">&#9670;</li>
         <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="trades">Trades</a>
-        </li>
-        <li class="nav-separator">&#9670;</li>
-        <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="positions">Positions</a>
-        </li>
-        <li class="nav-separator">&#9670;</li>
-        <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="clusters">Clusters</a>
+            <a class="nav-link" href="#" data-tab="journal">Journal</a>
         </li>
     </ul>
 
     <!-- Tab Content -->
-    <div id="tab-overview"></div>
-    <div id="tab-wallets" style="display:none"></div>
-    <div id="tab-tokens" style="display:none"></div>
-    <div id="tab-trades" style="display:none"></div>
-    <div id="tab-positions" style="display:none"></div>
-    <div id="tab-clusters" style="display:none"></div>
+    <div id="tab-command"></div>
+    <div id="tab-smart-money" style="display:none"></div>
+    <div id="tab-live-feed" style="display:none"></div>
+    <div id="tab-journal" style="display:none"></div>
 </div>
 
 <!-- Modal Container -->
@@ -971,7 +1174,7 @@ function enterApp() {
 // Tab Navigation
 // =========================================================================
 const tabs = document.querySelectorAll('[data-tab]');
-let activeTab = 'overview';
+let activeTab = 'command';
 
 tabs.forEach(tab => {
     tab.addEventListener('click', (e) => {
@@ -1210,7 +1413,7 @@ async function showWalletDetail(address) {
             </div>
             <div class="stat-mini">
                 <div class="stat-label">30D TRADES</div>
-                <div style="font-size:1.4rem; font-weight:600; color:var(--text-secondary);">${((w.gmgn_buy_30d||0)+(w.gmgn_sell_30d||0)).toLocaleString() || w.total_trades}</div>
+                <div style="font-size:1.4rem; font-weight:600; color:${((w.gmgn_buy_30d||0)+(w.gmgn_sell_30d||0)) > 15000 ? '#ff4444' : 'var(--text-secondary)'};">${(() => { const t = (w.gmgn_buy_30d||0)+(w.gmgn_sell_30d||0); return t > 15000 ? (t/1000).toFixed(0)+'K BOT' : t > 0 ? t.toLocaleString() : w.total_trades || '\u2014'; })()}</div>
             </div>
         </div>
 
@@ -1404,7 +1607,6 @@ async function showTokenDetail(mint) {
 // Chart Instances
 // =========================================================================
 let pnlChart = null;
-let walletScoreChart = null;
 let winLossChart = null;
 let tradeActivityChart = null;
 let portfolioChart = null;
@@ -1472,46 +1674,6 @@ async function loadPnlChart() {
             scales: {
                 x: { ticks: { color: '#8a8070' }, grid: { color: '#e8e0d0' } },
                 y: { ticks: { color: '#8a8070' }, grid: { color: '#e8e0d0' } }
-            }
-        }
-    });
-}
-
-// =========================================================================
-// Chart: Wallet Score Distribution
-// =========================================================================
-async function loadWalletScoreChart() {
-    const data = await fetchApi('/api/wallet_score_distribution');
-    const canvas = document.getElementById('walletScoreChart');
-    if (!canvas || !data) return;
-
-    walletScoreChart = destroyChart(walletScoreChart);
-    const dist = data.distribution;
-
-    const barColors = ['#8b2c2c', '#8b6914', '#8b6914', '#4a8c5c', '#2d6b3f'];
-
-    walletScoreChart = new Chart(canvas, {
-        type: 'bar',
-        data: {
-            labels: dist.map(d => d.range),
-            datasets: [{
-                label: 'Wallets',
-                data: dist.map(d => d.count),
-                backgroundColor: barColors.map(c => c + '40'),
-                borderColor: barColors,
-                borderWidth: 1,
-                borderRadius: 3,
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { display: false },
-                title: { display: true, text: 'Score Distribution', color: '#5a5348', font: { size: 11, family: "'Inter', sans-serif" } }
-            },
-            scales: {
-                x: { ticks: { color: '#8a8070' }, grid: { display: false } },
-                y: { ticks: { color: '#8a8070' }, grid: { color: '#e8e0d0' }, beginAtZero: true }
             }
         }
     });
@@ -1652,21 +1814,64 @@ function loadPortfolioChart(stats) {
 // =========================================================================
 async function loadTab(name) {
     switch (name) {
-        case 'overview': return loadOverview();
-        case 'wallets': return loadWallets();
-        case 'tokens': return loadTokens();
-        case 'trades': return loadTrades();
-        case 'positions': return loadPositions();
-        case 'clusters': return loadClusters();
+        case 'command': return loadCommandCenter();
+        case 'smart-money': return loadSmartMoney();
+        case 'live-feed': return loadLiveFeed();
+        case 'journal': return loadJournal();
     }
 }
 
+// Source badge renderer
+function renderSourceBadge(source) {
+    const map = {
+        'fomo': {cls: 'badge-source-fomo', text: 'FOMO'},
+        'gmgn': {cls: 'badge-source-gmgn', text: 'GMGN'},
+        'manual': {cls: 'badge-source-manual', text: 'MANUAL'},
+        'cluster': {cls: 'badge-source-manual', text: 'CLUSTER'},
+    };
+    const m = map[source] || map['manual'];
+    return `<span class="badge-source ${m.cls}">${m.text}</span>`;
+}
+
+// Profit indicator dot
+function profitDot(pnl) {
+    if (pnl === null || pnl === undefined) return '<span class="profit-indicator no-data" title="No copy trades yet"></span>';
+    return pnl > 0
+        ? `<span class="profit-indicator profitable" title="+${Number(pnl).toFixed(4)} SOL"></span>`
+        : `<span class="profit-indicator unprofitable" title="${Number(pnl).toFixed(4)} SOL"></span>`;
+}
+
+// Toggle copy (monitored) status
+async function toggleCopy(address, event) {
+    if (event) event.stopPropagation();
+    try {
+        const res = await fetch('/api/wallet/' + encodeURIComponent(address) + '/toggle_monitor', { method: 'POST' });
+        if (res.ok) {
+            const data = await res.json();
+            // Update button in-place
+            const btn = event ? event.target.closest('.btn-toggle-copy') : null;
+            if (btn) {
+                btn.classList.toggle('active', data.is_monitored);
+                btn.textContent = data.is_monitored ? 'COPYING' : 'COPY';
+            }
+        }
+    } catch (e) { console.error('Toggle failed:', e); }
+}
+
+// Toggle side wallets expand/collapse
+function toggleSideWallets(address) {
+    const section = document.getElementById('side-' + address);
+    const chevron = document.getElementById('chev-' + address);
+    if (section) section.classList.toggle('expanded');
+    if (chevron) chevron.classList.toggle('open');
+}
+
 // =========================================================================
-// OVERVIEW TAB
+// COMMAND CENTER TAB
 // =========================================================================
-async function loadOverview() {
+async function loadCommandCenter() {
     const [data, tradeStats] = await Promise.all([
-        fetchApi('/api/overview'),
+        fetchApi('/api/command_center'),
         fetchApi('/api/trade_stats'),
     ]);
 
@@ -1698,395 +1903,83 @@ async function loadOverview() {
         modeEl.style.color = 'var(--text-dim)';
     }
 
-    const el = document.getElementById('tab-overview');
+    const pnl = data.pnl;
+    const stats = data.stats;
+    const positions = data.active_positions;
+    const signals = data.recent_signals;
+
+    const el = document.getElementById('tab-command');
     el.innerHTML = `
-        <div class="row g-3 mb-3">
-            <div class="col-md-3 col-6 fade-up">
-                <div class="rome-card">
-                    <div class="card-header-rome"><span class="title-text">Positions</span></div>
-                    <div class="card-body-inner text-center">
-                        <div class="stat-value" id="stat-positions">${data.open_positions}</div>
-                        <div class="stat-label">Open</div>
+        <!-- PnL Hero -->
+        <div class="rome-card mb-3 fade-up">
+            <div class="card-body-inner pnl-hero">
+                <div style="font-family:var(--font-display); font-size:9px; letter-spacing:3px; color:var(--text-dim); margin-bottom:8px;">ALL-TIME REALIZED PnL</div>
+                <div class="pnl-main">${fmtPnl(pnl.all_time)}</div>
+                <div class="pnl-period-row">
+                    <div>
+                        <div style="font-family:var(--font-display); font-size:8px; letter-spacing:2px; color:var(--text-dim);">TODAY</div>
+                        <div style="font-family:var(--font-serif); font-size:1.3rem; font-weight:600;">${fmtPnl(pnl.today)}</div>
+                    </div>
+                    <div>
+                        <div style="font-family:var(--font-display); font-size:8px; letter-spacing:2px; color:var(--text-dim);">7 DAYS</div>
+                        <div style="font-family:var(--font-serif); font-size:1.3rem; font-weight:600;">${fmtPnl(pnl['7d'])}</div>
+                    </div>
+                    <div>
+                        <div style="font-family:var(--font-display); font-size:8px; letter-spacing:2px; color:var(--text-dim);">30 DAYS</div>
+                        <div style="font-family:var(--font-serif); font-size:1.3rem; font-weight:600;">${fmtPnl(pnl['30d'])}</div>
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="row g-3 mb-3">
             <div class="col-md-3 col-6 fade-up">
                 <div class="rome-card">
                     <div class="card-header-rome"><span class="title-text">Invested</span></div>
                     <div class="card-body-inner text-center">
-                        <div class="stat-value" id="stat-invested">${fmt(data.total_invested, 4)}</div>
+                        <div class="stat-value">${fmt(stats.total_invested, 4)}</div>
                         <div class="stat-label">SOL Deployed</div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3 col-6 fade-up">
                 <div class="rome-card">
-                    <div class="card-header-rome"><span class="title-text">Unrealized</span></div>
+                    <div class="card-header-rome"><span class="title-text">Win Rate</span></div>
                     <div class="card-body-inner text-center">
-                        <div class="stat-value">${fmtPnl(data.unrealized_pnl)}</div>
-                        <div class="stat-label">Open PnL</div>
+                        <div class="stat-value" style="color:${stats.win_rate >= 50 ? 'var(--accent-green)' : 'var(--text-dim)'};">${stats.win_rate > 0 ? stats.win_rate + '%' : '\u2014'}</div>
+                        <div class="stat-label">Our Accuracy</div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3 col-6 fade-up">
                 <div class="rome-card">
-                    <div class="card-header-rome"><span class="title-text">All Time</span></div>
+                    <div class="card-header-rome"><span class="title-text">Best Trade</span></div>
                     <div class="card-body-inner text-center">
-                        <div class="stat-value">${fmtPnl(data.all_time_pnl)}</div>
-                        <div class="stat-label">Realized PnL</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row g-3 mb-3">
-            <div class="col-md-3 col-6 fade-up">
-                <div class="rome-card">
-                    <div class="card-header-rome"><span class="title-text">Wallets</span></div>
-                    <div class="card-body-inner text-center">
-                        <div class="stat-value" style="color:var(--text-secondary);">${data.monitored_wallets}</div>
-                        <div class="stat-label">Monitored</div>
+                        <div class="stat-value">${fmtPnl(stats.best_trade)}</div>
+                        <div class="stat-label">Top Win</div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3 col-6 fade-up">
                 <div class="rome-card">
-                    <div class="card-header-rome"><span class="title-text">Scored</span></div>
+                    <div class="card-header-rome"><span class="title-text">Worst Trade</span></div>
                     <div class="card-body-inner text-center">
-                        <div class="stat-value" style="color:var(--text-secondary);">${data.total_wallets}</div>
-                        <div class="stat-label">Wallets Analyzed</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3 col-6 fade-up">
-                <div class="rome-card">
-                    <div class="card-header-rome"><span class="title-text">Discovery</span></div>
-                    <div class="card-body-inner text-center">
-                        <div class="stat-value" style="color:var(--text-secondary);">${data.total_tokens}</div>
-                        <div class="stat-label">Tokens Found</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3 col-6 fade-up">
-                <div class="rome-card">
-                    <div class="card-header-rome"><span class="title-text">Today</span></div>
-                    <div class="card-body-inner text-center">
-                        <div class="stat-value">${fmtPnl(data.today_pnl)}</div>
-                        <div class="stat-label">${data.today_buys} Buys / ${data.today_sells} Sells</div>
+                        <div class="stat-value">${fmtPnl(stats.worst_trade)}</div>
+                        <div class="stat-label">Biggest Loss</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="rome-card mb-3 fade-up">
-            <div class="card-header-rome"><span class="title-text">PnL Chart</span></div>
-            <div class="chart-container">
-                <canvas id="pnlChart"></canvas>
-            </div>
-        </div>
-
-        <div class="row g-3 mb-3">
-            <div class="col-md-4 fade-up">
-                <div class="rome-card chart-small">
-                    <div class="card-header-rome"><span class="title-text">Wallet Scores</span></div>
-                    <div class="chart-container">
-                        <canvas id="walletScoreChart"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 fade-up">
-                <div class="rome-card chart-small">
-                    <div class="card-header-rome"><span class="title-text">Win / Loss</span></div>
-                    <div class="chart-container">
-                        <canvas id="winLossChart"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 fade-up">
-                <div class="rome-card chart-small">
-                    <div class="card-header-rome"><span class="title-text">Portfolio</span></div>
-                    <div class="chart-container">
-                        <canvas id="portfolioChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="rome-card mb-3 fade-up">
-            <div class="card-header-rome"><span class="title-text">Trade Activity</span></div>
-            <div class="chart-container">
-                <canvas id="tradeActivityChart"></canvas>
-            </div>
-        </div>
-
-        <div class="rome-card fade-up">
-            <div class="card-header-rome">
-                <span class="title-text">Recent Trades</span>
-                <span class="count-text">${data.recent_trades.length} entries</span>
-            </div>
-            <div class="card-body-inner">
-                ${data.recent_trades.length > 0 ? `
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover mb-0">
-                        <thead><tr>
-                            <th>Time</th><th>Token</th><th>Side</th><th>Amount</th><th>Status</th>
-                        </tr></thead>
-                        <tbody>
-                            ${data.recent_trades.map(t => `
-                            <tr onclick="showTokenDetail('${t.token_mint}')">
-                                <td style="white-space:nowrap; color:var(--text-dim)">${t.created_at || '\u2014'}</td>
-                                <td>${t.token_symbol || shortAddr(t.token_mint)}</td>
-                                <td><span class="badge badge-${t.side}">${t.side.toUpperCase()}</span></td>
-                                <td>${fmt(t.amount_sol, 6)} SOL</td>
-                                <td>${t.status}</td>
-                            </tr>`).join('')}
-                        </tbody>
-                    </table>
-                </div>` : '<div class="loading-text">Awaiting trade data...</div>'}
-            </div>
-        </div>
-    `;
-
-    loadPnlChart();
-    loadWalletScoreChart();
-    if (tradeStats) {
-        loadWinLossChart(tradeStats);
-        loadTradeActivityChart(tradeStats);
-        loadPortfolioChart(tradeStats);
-    }
-    updateTicker(data.recent_trades);
-    updateRefreshTimer();
-}
-
-// =========================================================================
-// WALLETS TAB
-// =========================================================================
-async function loadWallets() {
-    const data = await fetchApi('/api/wallets');
-    const el = document.getElementById('tab-wallets');
-    if (!data) return;
-
-    if (data.wallets.length === 0) {
-        el.innerHTML = `<div class="empty-state">
-            <h5>No Wallets Scored</h5>
-            <p style="margin-top:12px;">Run discovery + analysis first:</p>
-            <code>python main.py --discover</code><br><br>
-            <code>python main.py --analyze</code>
-        </div>`;
-        return;
-    }
-
-    const monitored = data.wallets.filter(w => w.is_monitored);
-    const topProfit = data.wallets.reduce((max, w) => Math.max(max, w.gmgn_profit_30d_usd || 0), 0);
-
-    el.innerHTML = `
-        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:16px;" class="wallets-summary-grid">
-            <div class="stat-card fade-up">
-                <div class="stat-label">MONITORED</div>
-                <div class="stat-value">${monitored.length}</div>
-            </div>
-            <div class="stat-card fade-up">
-                <div class="stat-label">TOTAL SCORED</div>
-                <div class="stat-value">${data.wallets.length}</div>
-            </div>
-            <div class="stat-card fade-up">
-                <div class="stat-label">TOP 30D PROFIT</div>
-                <div class="stat-value" style="color:var(--accent-green);">${fmtProfit(topProfit).replace(/<[^>]+>/g,'')}</div>
-            </div>
-            <div class="stat-card fade-up">
-                <div class="stat-label">AVG SCORE</div>
-                <div class="stat-value">${(data.wallets.reduce((s,w)=>s+w.total_score,0)/data.wallets.length).toFixed(0)}</div>
-            </div>
-        </div>
-        <div class="rome-card fade-up">
-            <div class="card-header-rome">
-                <span class="title-text">Smart Wallet Leaderboard</span>
-                <span class="count-text">${data.wallets.length} wallets</span>
-            </div>
-            <div class="card-body-inner">
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover mb-0">
-                        <thead><tr>
-                            <th>#</th><th>Address</th><th>Score</th><th>30D Profit</th>
-                            <th>Win Rate</th><th>30D Trades</th><th>SOL Bal</th><th>Tags</th><th>Status</th>
-                        </tr></thead>
-                        <tbody>
-                            ${data.wallets.map((w, i) => {
-                                const wr = w.win_rate || 0;
-                                const wrColor = wr >= 60 ? 'var(--accent-green)' : wr >= 40 ? '#8b6914' : 'var(--text-dim)';
-                                const trades30d = (w.gmgn_buy_30d || 0) + (w.gmgn_sell_30d || 0);
-                                return `
-                            <tr onclick="showWalletDetail('${w.address}')">
-                                <td style="color:var(--text-dim)">${i + 1}</td>
-                                <td class="addr">
-                                    ${w.is_monitored ? '<span class="pulse-dot"></span>' : ''}${shortAddr(w.address)}
-                                </td>
-                                <td>
-                                    <strong style="color:${scoreColor(w.total_score)}">${w.total_score.toFixed(0)}</strong>
-                                    <div class="score-bar mt-1"><div class="score-fill" style="width:${w.total_score}%; background:${scoreColor(w.total_score)};"></div></div>
-                                </td>
-                                <td>${fmtProfit(w.gmgn_profit_30d_usd)}</td>
-                                <td style="color:${wrColor}; font-weight:600;">${wr > 0 ? wr.toFixed(0) + '%' : '<span style="color:var(--text-dim)">\u2014</span>'}</td>
-                                <td style="text-align:center;">${trades30d > 0 ? trades30d.toLocaleString() : (w.total_trades || '\u2014')}</td>
-                                <td>${w.gmgn_sol_balance ? w.gmgn_sol_balance.toFixed(1) : '\u2014'}</td>
-                                <td>${renderTags(w.gmgn_tags)}</td>
-                                <td>
-                                    ${w.is_monitored ? '<span class="badge badge-monitored">MON</span>' : ''}
-                                    ${w.is_flagged ? '<span class="badge badge-flagged">' + (w.flag_reason || 'FLAG') + '</span>' : ''}
-                                </td>
-                            </tr>`;}).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    `;
-    updateRefreshTimer();
-}
-
-// =========================================================================
-// TOKENS TAB
-// =========================================================================
-async function loadTokens() {
-    const data = await fetchApi('/api/tokens');
-    const el = document.getElementById('tab-tokens');
-    if (!data) return;
-
-    if (data.tokens.length === 0) {
-        el.innerHTML = `<div class="empty-state">
-            <h5>No Tokens Discovered</h5>
-            <p style="margin-top:12px;">Run discovery:</p>
-            <code>python main.py --discover</code>
-        </div>`;
-        return;
-    }
-
-    el.innerHTML = `
-        <div class="rome-card fade-up">
-            <div class="card-header-rome">
-                <span class="title-text">Discovered Tokens</span>
-                <span class="count-text">${data.tokens.length} tokens</span>
-            </div>
-            <div class="card-body-inner">
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover mb-0">
-                        <thead><tr>
-                            <th>#</th><th>Symbol</th><th>Multiplier</th><th>Market Cap</th>
-                            <th>Liquidity</th><th>Vol 24h</th><th>Holders</th><th>Source</th>
-                        </tr></thead>
-                        <tbody>
-                            ${data.tokens.map((t, i) => `
-                            <tr onclick="showTokenDetail('${t.mint_address}')">
-                                <td style="color:var(--text-dim)">${i + 1}</td>
-                                <td>
-                                    <strong style="color:var(--text-primary)">${t.symbol || '\u2014'}</strong>
-                                    <br><span style="color:var(--text-dim); font-size:10px;">${t.name || ''}</span>
-                                </td>
-                                <td>
-                                    <strong style="color:var(--accent-gold);">
-                                        ${t.price_multiplier ? t.price_multiplier.toFixed(1) + 'x' : '\u2014'}
-                                    </strong>
-                                </td>
-                                <td>${fmtUsd(t.market_cap_usd)}</td>
-                                <td>${fmtUsd(t.liquidity_usd)}</td>
-                                <td>${fmtUsd(t.volume_24h_usd)}</td>
-                                <td>${t.holder_count || '\u2014'}</td>
-                                <td style="color:var(--accent-amber)">${t.data_source || '\u2014'}</td>
-                            </tr>`).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    `;
-    updateRefreshTimer();
-}
-
-// =========================================================================
-// TRADES TAB
-// =========================================================================
-async function loadTrades() {
-    const data = await fetchApi('/api/trades');
-    const el = document.getElementById('tab-trades');
-    if (!data) return;
-
-    if (data.trades.length === 0) {
-        el.innerHTML = `<div class="empty-state">
-            <h5>No Trades Executed</h5>
-            <p style="margin-top:12px;">Trades will appear once the agent starts executing.</p>
-        </div>`;
-        return;
-    }
-
-    el.innerHTML = `
-        <div class="rome-card fade-up">
-            <div class="card-header-rome">
-                <span class="title-text">Trade History</span>
-                <span class="count-text">${data.trades.length} records</span>
-            </div>
-            <div class="card-body-inner">
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover mb-0">
-                        <thead><tr>
-                            <th>Time</th><th>Token</th><th>Side</th><th>SOL</th>
-                            <th>Price</th><th>Triggered By</th><th>Reason</th><th>Status</th>
-                        </tr></thead>
-                        <tbody>
-                            ${data.trades.map(t => `
-                            <tr>
-                                <td style="white-space:nowrap; color:var(--text-dim)">${t.created_at || '\u2014'}</td>
-                                <td>
-                                    <span style="cursor:pointer; color:var(--accent-gold);" onclick="showTokenDetail('${t.token_mint}')">
-                                        ${t.token_symbol || shortAddr(t.token_mint)}
-                                    </span>
-                                </td>
-                                <td><span class="badge badge-${t.side}">${t.side.toUpperCase()}</span></td>
-                                <td>${fmt(t.amount_sol, 6)}</td>
-                                <td>${fmtUsd(t.price_usd)}</td>
-                                <td>
-                                    <span class="addr" style="cursor:pointer;" onclick="showWalletDetail('${t.triggered_by_wallet}')">
-                                        ${shortAddr(t.triggered_by_wallet)}
-                                    </span>
-                                </td>
-                                <td style="color:var(--text-dim)">${t.sell_reason || '\u2014'}</td>
-                                <td>${t.status}</td>
-                            </tr>`).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    `;
-    updateRefreshTimer();
-}
-
-// =========================================================================
-// POSITIONS TAB
-// =========================================================================
-async function loadPositions() {
-    const data = await fetchApi('/api/positions');
-    const el = document.getElementById('tab-positions');
-    if (!data) return;
-
-    if (data.positions.length === 0) {
-        el.innerHTML = `<div class="empty-state">
-            <h5>No Positions</h5>
-            <p style="margin-top:12px;">Positions will appear once the agent executes trades.</p>
-        </div>`;
-        return;
-    }
-
-    const open = data.positions.filter(p => p.status === 'open');
-    const closed = data.positions.filter(p => p.status === 'closed');
-
-    el.innerHTML = `
+        <!-- Active Positions -->
         <div class="rome-card mb-3 fade-up">
             <div class="card-header-rome">
-                <span class="title-text">Open Positions</span>
-                <span class="count-text">${open.length} active</span>
+                <span class="title-text">Active Positions</span>
+                <span class="count-text">${positions.length} open</span>
             </div>
             <div class="card-body-inner">
-                ${open.length > 0 ? `
+                ${positions.length > 0 ? `
                 <div class="table-responsive">
                     <table class="table table-sm table-hover mb-0">
                         <thead><tr>
@@ -2094,25 +1987,15 @@ async function loadPositions() {
                             <th>Multiple</th><th>Unrealized PnL</th><th>Triggered By</th>
                         </tr></thead>
                         <tbody>
-                            ${open.map(p => `
+                            ${positions.map(p => `
                             <tr>
-                                <td>
-                                    <span style="cursor:pointer; color:var(--accent-gold);" onclick="showTokenDetail('${p.token_mint}')">
-                                        <strong>${p.token_symbol || shortAddr(p.token_mint)}</strong>
-                                    </span>
-                                </td>
+                                <td><span style="cursor:pointer; color:var(--accent-gold);" onclick="showTokenDetail('${p.token_mint}')"><strong>${p.token_symbol || shortAddr(p.token_mint)}</strong></span></td>
                                 <td>${fmt(p.amount_sol_invested, 4)} SOL</td>
                                 <td>${fmtUsd(p.entry_price_usd)}</td>
                                 <td>${fmtUsd(p.current_price_usd)}</td>
-                                <td>
-                                    ${p.multiplier ? `<strong style="color:${p.multiplier >= 1 ? 'var(--accent-green)' : 'var(--accent-red)'};">${p.multiplier.toFixed(2)}x</strong>` : '\u2014'}
-                                </td>
+                                <td>${p.multiplier ? `<strong style="color:${p.multiplier >= 1 ? 'var(--accent-green)' : 'var(--accent-red)'};">${p.multiplier}x</strong>` : '\u2014'}</td>
                                 <td>${fmtPnl(p.unrealized_pnl_sol)}</td>
-                                <td>
-                                    <span class="addr" style="cursor:pointer;" onclick="showWalletDetail('${p.triggered_by_wallet}')">
-                                        ${shortAddr(p.triggered_by_wallet)}
-                                    </span>
-                                </td>
+                                <td><span class="addr" style="cursor:pointer;" onclick="showWalletDetail('${p.triggered_by_wallet}')">${shortAddr(p.triggered_by_wallet)}</span></td>
                             </tr>`).join('')}
                         </tbody>
                     </table>
@@ -2120,175 +2003,401 @@ async function loadPositions() {
             </div>
         </div>
 
-        <div class="rome-card fade-up">
+        <!-- Recent Signals -->
+        <div class="rome-card mb-3 fade-up">
             <div class="card-header-rome">
-                <span class="title-text">Closed Positions</span>
-                <span class="count-text">${closed.length} records</span>
+                <span class="title-text">Recent Signals</span>
+                <span class="count-text">${signals.length} latest</span>
             </div>
             <div class="card-body-inner">
-                ${closed.length > 0 ? `
+                ${signals.length > 0 ? `
                 <div class="table-responsive">
                     <table class="table table-sm table-hover mb-0">
-                        <thead><tr>
-                            <th>Token</th><th>Invested</th><th>Realized PnL</th>
-                            <th>Reason</th><th>Opened</th><th>Closed</th>
-                        </tr></thead>
+                        <thead><tr><th>Time</th><th>Wallet</th><th>Token</th><th>Type</th><th>Status</th></tr></thead>
                         <tbody>
-                            ${closed.map(p => `
-                            <tr>
-                                <td>
-                                    <span style="cursor:pointer; color:var(--text-secondary);" onclick="showTokenDetail('${p.token_mint}')">
-                                        <strong>${p.token_symbol || shortAddr(p.token_mint)}</strong>
-                                    </span>
-                                </td>
-                                <td>${fmt(p.amount_sol_invested, 4)} SOL</td>
-                                <td>${fmtPnl(p.realized_pnl_sol)}</td>
-                                <td style="color:var(--text-dim)">${p.close_reason || '\u2014'}</td>
-                                <td style="color:var(--text-dim); white-space:nowrap;">${p.opened_at || '\u2014'}</td>
-                                <td style="color:var(--text-dim); white-space:nowrap;">${p.closed_at || '\u2014'}</td>
-                            </tr>`).join('')}
+                            ${signals.map(s => {
+                                const status = s.executed ? '<span style="color:var(--accent-green); font-weight:600;">Copied</span>'
+                                    : s.skip_reason ? '<span style="color:var(--accent-red);">Skipped: ' + s.skip_reason + '</span>'
+                                    : '<span style="color:var(--accent-amber);">Pending</span>';
+                                return `<tr>
+                                    <td style="white-space:nowrap; color:var(--text-dim);">${s.created_at ? s.created_at.split('T').pop().split('.')[0] : '\u2014'}</td>
+                                    <td><span class="addr" style="cursor:pointer;" onclick="showWalletDetail('${s.wallet_address}')">${shortAddr(s.wallet_address)}</span> <span style="color:${scoreColor(s.wallet_total_score || 0)}; font-size:10px;">${s.wallet_total_score ? s.wallet_total_score.toFixed(0) : ''}</span></td>
+                                    <td style="color:var(--accent-gold);">${s.token_symbol || shortAddr(s.token_mint)}</td>
+                                    <td><span class="badge badge-${s.signal_type === 'sell' ? 'sell' : 'buy'}">${(s.signal_type || 'buy').toUpperCase()}</span></td>
+                                    <td>${status}</td>
+                                </tr>`;}).join('')}
                         </tbody>
                     </table>
-                </div>` : '<div style="color:var(--text-dim); text-align:center; padding:20px; font-style:italic;">No closed positions</div>'}
+                </div>` : '<div style="color:var(--text-dim); text-align:center; padding:20px; font-style:italic;">Awaiting signals... Run <code>python main.py --monitor</code></div>'}
+            </div>
+        </div>
+
+        <!-- PnL Chart -->
+        <div class="rome-card mb-3 fade-up">
+            <div class="card-header-rome"><span class="title-text">PnL Chart</span></div>
+            <div class="chart-container"><canvas id="pnlChart"></canvas></div>
+        </div>
+
+        <!-- Analytics Row -->
+        <div class="row g-3 mb-3">
+            <div class="col-md-4 fade-up">
+                <div class="rome-card chart-small">
+                    <div class="card-header-rome"><span class="title-text">Win / Loss</span></div>
+                    <div class="chart-container"><canvas id="winLossChart"></canvas></div>
+                </div>
+            </div>
+            <div class="col-md-4 fade-up">
+                <div class="rome-card chart-small">
+                    <div class="card-header-rome"><span class="title-text">Trade Activity</span></div>
+                    <div class="chart-container"><canvas id="tradeActivityChart"></canvas></div>
+                </div>
+            </div>
+            <div class="col-md-4 fade-up">
+                <div class="rome-card chart-small">
+                    <div class="card-header-rome"><span class="title-text">Portfolio</span></div>
+                    <div class="chart-container"><canvas id="portfolioChart"></canvas></div>
+                </div>
             </div>
         </div>
     `;
+
+    loadPnlChart();
+    if (tradeStats) {
+        loadWinLossChart(tradeStats);
+        loadTradeActivityChart(tradeStats);
+        loadPortfolioChart(tradeStats);
+    }
     updateRefreshTimer();
 }
 
 // =========================================================================
-// CLUSTERS TAB
+// SMART MONEY TAB — Wallet cards with nested side wallets
 // =========================================================================
-async function loadClusters() {
-    const data = await fetchApi('/api/clusters');
+async function loadSmartMoney() {
+    const data = await fetchApi('/api/smart_money');
+    const el = document.getElementById('tab-smart-money');
     if (!data) return;
 
-    const el = document.getElementById('tab-clusters');
+    if (data.wallets.length === 0) {
+        el.innerHTML = `<div class="empty-state">
+            <h5>No Smart Money Found</h5>
+            <p style="margin-top:12px;">Run discovery + analysis first:</p>
+            <code>python main.py --discover</code><br><br>
+            <code>python main.py --analyze</code>
+        </div>`;
+        return;
+    }
 
     let html = `
-        <div class="row g-3 mb-4" style="margin-top:4px;">
-            <div class="col-md-3 col-6 fade-up">
-                <div class="rome-card">
-                    <div class="card-header-rome"><span class="title-text">Clusters</span></div>
-                    <div class="card-body-inner text-center" style="padding:20px;">
-                        <div class="stat-value" style="color:var(--accent-gold);">${data.total_clusters}</div>
-                        <div class="stat-label">Clusters Found</div>
-                    </div>
-                </div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-4 col-6 fade-up">
+                <div class="rome-card"><div class="card-body-inner text-center" style="padding:16px;">
+                    <div class="stat-value" style="color:var(--accent-gold);">${data.total_monitored}</div>
+                    <div class="stat-label">Copying</div>
+                </div></div>
             </div>
-            <div class="col-md-3 col-6 fade-up">
-                <div class="rome-card">
-                    <div class="card-header-rome"><span class="title-text">Side Wallets</span></div>
-                    <div class="card-body-inner text-center" style="padding:20px;">
-                        <div class="stat-value" style="color:var(--accent-amber);">${data.total_side_wallets}</div>
-                        <div class="stat-label">Identified</div>
-                    </div>
-                </div>
+            <div class="col-md-4 col-6 fade-up">
+                <div class="rome-card"><div class="card-body-inner text-center" style="padding:16px;">
+                    <div class="stat-value" style="color:var(--text-secondary);">${data.total_clusters}</div>
+                    <div class="stat-label">Clusters Found</div>
+                </div></div>
             </div>
-            <div class="col-md-6 col-12 fade-up">
-                <div class="rome-card">
-                    <div class="card-header-rome"><span class="title-text">About Clusters</span></div>
-                    <div class="card-body-inner" style="padding:16px; font-size:12px; color:var(--text-dim); line-height:1.8;">
-                        Clusters are groups of wallets controlled by the same operator.<br>
-                        <span style="color:var(--accent-gold); font-weight:500;">Side wallets</span> buy tokens before the public wallet,
-                        giving us an early entry signal.<br>
-                        Run <code style="color:var(--accent-gold); background:var(--bg-secondary); padding:2px 6px; border-radius:3px;">python main.py --clusters</code> to detect new clusters.
-                    </div>
-                </div>
+            <div class="col-md-4 col-12 fade-up">
+                <div class="rome-card"><div class="card-body-inner text-center" style="padding:16px;">
+                    <div class="stat-value" style="color:var(--accent-amber);">${data.total_side_wallets}</div>
+                    <div class="stat-label">Side Wallets</div>
+                </div></div>
             </div>
         </div>
     `;
 
-    if (data.clusters.length === 0) {
+    data.wallets.forEach((w, i) => {
+        const wr = w.win_rate || 0;
+        const wrColor = wr >= 60 ? 'var(--accent-green)' : wr >= 40 ? '#8b6914' : 'var(--text-dim)';
+        const cluster = w.cluster;
+        const sideWallets = cluster ? (cluster.side_wallets || []) : [];
+        const hasSideWallets = sideWallets.length > 0;
+
         html += `
-            <div class="rome-card fade-up">
-                <div class="card-header-rome"><span class="title-text">No Clusters Yet</span></div>
-                <div class="card-body-inner" style="text-align:center; padding:40px;">
-                    <div style="font-family:var(--font-serif); font-size:16px; font-style:italic; color:var(--text-dim);">
-                        Run --analyze then --clusters to discover wallet groups
+        <div class="smart-money-card fade-up" style="margin-bottom:10px;">
+            <!-- Main Row -->
+            <div style="padding:14px 16px; display:flex; align-items:center; gap:12px; cursor:pointer; flex-wrap:wrap;"
+                 onclick="${hasSideWallets ? "toggleSideWallets('" + w.address + "')" : "showWalletDetail('" + w.address + "')"}">
+                <!-- Rank -->
+                <div style="font-family:var(--font-serif); font-size:1.3rem; font-weight:600; color:var(--text-dim); min-width:28px; text-align:center;">${i + 1}</div>
+                <!-- Address + Source -->
+                <div style="min-width:120px; flex:1;">
+                    <div>
+                        ${w.is_monitored ? '<span class="pulse-dot"></span>' : ''}
+                        <span class="addr" style="cursor:pointer;" onclick="event.stopPropagation(); showWalletDetail('${w.address}')">${shortAddr(w.address)}</span>
+                        ${hasSideWallets ? '<span class="expand-chevron' + '" id="chev-' + w.address + '">\u25B6</span>' : ''}
                     </div>
+                    <div style="margin-top:3px;">${renderSourceBadge(w.source || 'manual')} ${renderTags(w.gmgn_tags)}</div>
+                </div>
+                <!-- 30D Profit -->
+                <div style="text-align:center; min-width:80px;">
+                    <div style="font-family:var(--font-display); font-size:8px; letter-spacing:1px; color:var(--text-dim);">30D PROFIT</div>
+                    <div style="font-size:13px; font-weight:600;">${fmtProfit(w.gmgn_profit_30d_usd)}</div>
+                </div>
+                <!-- Win Rate -->
+                <div style="text-align:center; min-width:60px;">
+                    <div style="font-family:var(--font-display); font-size:8px; letter-spacing:1px; color:var(--text-dim);">WIN RATE</div>
+                    <div style="font-size:13px; font-weight:600; color:${wrColor};">${wr > 0 ? wr.toFixed(0) + '%' : '\u2014'}</div>
+                </div>
+                <!-- Score -->
+                <div style="text-align:center; min-width:60px;">
+                    <div style="font-family:var(--font-display); font-size:8px; letter-spacing:1px; color:var(--text-dim);">SCORE</div>
+                    <div style="font-size:13px; font-weight:600; color:${scoreColor(w.total_score)};">${w.total_score.toFixed(0)}</div>
+                    <div class="score-bar" style="margin-top:3px;"><div class="score-fill" style="width:${w.total_score}%; background:${scoreColor(w.total_score)};"></div></div>
+                </div>
+                <!-- Our PnL -->
+                <div style="text-align:center; min-width:70px;">
+                    <div style="font-family:var(--font-display); font-size:8px; letter-spacing:1px; color:var(--text-dim);">OUR PnL</div>
+                    <div style="font-size:12px;">${profitDot(w.our_copy_pnl_sol)} ${w.our_copy_pnl_sol !== null ? fmtPnl(w.our_copy_pnl_sol) : '<span style="color:var(--text-dim); font-size:11px;">\u2014</span>'}</div>
+                </div>
+                <!-- Copy Toggle -->
+                <div style="min-width:60px; text-align:center;" onclick="event.stopPropagation();">
+                    <button class="btn-toggle-copy ${w.is_monitored ? 'active' : ''}" onclick="toggleCopy('${w.address}', event)">
+                        ${w.is_monitored ? 'COPYING' : 'COPY'}
+                    </button>
                 </div>
             </div>
-        `;
-    } else {
-        data.clusters.forEach((c, idx) => {
-            const members = c.members || [];
-            const sideWallets = members.filter(m => m.is_side_wallet);
-            const leadTime = c.avg_lead_time_seconds ? (c.avg_lead_time_seconds / 60).toFixed(1) + ' min' : '\u2014';
 
-            html += `
-                <div class="rome-card mb-3 fade-up">
-                    <div class="card-header-rome">
-                        <span class="title-text">Cluster ${idx + 1}</span>
-                        <span class="count-text">
-                            Seed: ${shortAddr(c.seed_wallet)} &nbsp;\u2022&nbsp;
-                            Score: <span style="color:${scoreColor(c.seed_score || 0)}">${c.seed_score ? c.seed_score.toFixed(0) : '\u2014'}</span> &nbsp;\u2022&nbsp;
-                            Members: ${c.total_members} &nbsp;\u2022&nbsp;
-                            Lead: <span style="color:var(--accent-gold)">${leadTime}</span>
-                        </span>
-                    </div>
-                    <div class="card-body-inner">
-                        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:16px;">
-                            <div class="stat-mini">
-                                <div class="stat-label">Seed Wallet</div>
-                                <div class="addr-copy" onclick="copyAddr('${c.seed_wallet}', event)" style="font-size:11px; cursor:pointer;">
-                                    ${shortAddr(c.seed_wallet)}
-                                </div>
-                            </div>
-                            <div class="stat-mini">
-                                <div class="stat-label">Best Side Wallet</div>
-                                <div style="font-size:11px; color:var(--accent-gold);">
-                                    ${c.best_side_wallet ? `<span class="addr-copy" onclick="copyAddr('${c.best_side_wallet}', event)" style="cursor:pointer;">${shortAddr(c.best_side_wallet)}</span>` : '\u2014'}
-                                </div>
-                            </div>
-                            <div class="stat-mini">
-                                <div class="stat-label">Avg Lead Time</div>
-                                <div style="color:var(--accent-green); font-weight:500;">${leadTime}</div>
-                            </div>
-                            <div class="stat-mini">
-                                <div class="stat-label">Side Wallets</div>
-                                <div style="color:var(--accent-gold); font-weight:500;">${sideWallets.length}</div>
-                            </div>
-                        </div>
-
-                        ${members.length > 0 ? `
-                        <div style="color:var(--text-dim); font-family:var(--font-display); font-size:9px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-light); padding-bottom:4px;">
-                            MEMBERS (${members.length})
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover mb-0">
-                                <thead><tr>
-                                    <th>Wallet</th><th>Relationship</th><th>Confidence</th><th>Lead Time</th><th>Side?</th><th>Monitored</th>
-                                </tr></thead>
-                                <tbody>
-                                    ${members.map(m => {
-                                        const conf = (m.confidence * 100).toFixed(0);
-                                        const confColor = m.confidence >= 0.7 ? 'var(--accent-green)' : m.confidence >= 0.4 ? 'var(--accent-amber)' : 'var(--text-dim)';
-                                        const mLead = m.avg_lead_time_seconds ? (m.avg_lead_time_seconds / 60).toFixed(1) + 'm' : '\u2014';
-                                        return `
-                                        <tr style="${m.is_side_wallet ? 'background:rgba(184,150,12,0.04);' : ''}">
-                                            <td>
-                                                <span class="addr-copy" onclick="copyAddr('${m.wallet_address}', event)" style="cursor:pointer;">
-                                                    ${shortAddr(m.wallet_address)}
-                                                </span>
-                                            </td>
-                                            <td style="color:var(--text-dim); font-size:11px;">${m.relationship_type}</td>
-                                            <td><span style="color:${confColor}">${conf}%</span></td>
-                                            <td style="color:var(--accent-green);">${mLead}</td>
-                                            <td>${m.is_side_wallet ? '<span style="color:var(--accent-gold); font-weight:600;">Yes</span>' : '<span style="color:var(--text-dim);">No</span>'}</td>
-                                            <td>${m.is_monitored ? '<span class="badge badge-monitored">MON</span>' : ''}</td>
-                                        </tr>`;
-                                    }).join('')}
-                                </tbody>
-                            </table>
-                        </div>` : '<div style="color:var(--text-dim); text-align:center; padding:12px; font-style:italic;">No members</div>'}
-                    </div>
+            <!-- Side Wallets Section (collapsed) -->
+            ${hasSideWallets ? `
+            <div class="side-wallets-section" id="side-${w.address}">
+                <div style="font-family:var(--font-display); font-size:9px; letter-spacing:2px; color:var(--text-dim); margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid var(--border-light);">
+                    SIDE WALLETS (${sideWallets.length}) \u2014 Cluster Detection
                 </div>
-            `;
-        });
+                ${sideWallets.map(sw => {
+                    const conf = ((sw.confidence || 0) * 100).toFixed(0);
+                    const confColor = sw.confidence >= 0.7 ? 'var(--accent-green)' : sw.confidence >= 0.4 ? 'var(--accent-amber)' : 'var(--text-dim)';
+                    const leadMin = sw.avg_lead_time_seconds ? (sw.avg_lead_time_seconds / 60).toFixed(1) : '?';
+                    return `
+                    <div class="side-wallet-row">
+                        <div style="color:var(--accent-gold); font-size:10px;">\u25B8</div>
+                        <div>
+                            <span class="addr" style="cursor:pointer; font-size:11px;" onclick="showWalletDetail('${sw.wallet_address}')">${shortAddr(sw.wallet_address)}</span>
+                            ${sw.is_monitored ? '<span class="badge badge-monitored" style="font-size:7px; padding:1px 4px;">MON</span>' : ''}
+                        </div>
+                        <div style="text-align:center;"><span style="color:${confColor}; font-weight:600;">${conf}%</span> <span style="color:var(--text-dim); font-size:9px;">conf</span></div>
+                        <div style="text-align:center; color:var(--accent-green);">${leadMin}m <span style="color:var(--text-dim); font-size:9px;">lead</span></div>
+                        <div style="text-align:center; color:${scoreColor(sw.total_score || 0)};">${sw.total_score ? sw.total_score.toFixed(0) : '\u2014'}</div>
+                    </div>`;
+                }).join('')}
+            </div>` : ''}
+        </div>`;
+    });
+
+    el.innerHTML = html;
+    updateRefreshTimer();
+}
+
+// =========================================================================
+// LIVE FEED TAB — Real-time signal stream
+// =========================================================================
+async function loadLiveFeed() {
+    const data = await fetchApi('/api/signals');
+    const el = document.getElementById('tab-live-feed');
+    if (!data) return;
+
+    let html = `
+        <div class="row g-3 mb-3">
+            <div class="col-md-4 col-4 fade-up">
+                <div class="rome-card"><div class="card-body-inner text-center" style="padding:16px;">
+                    <div class="stat-value">${data.today_total}</div>
+                    <div class="stat-label">Signals Today</div>
+                </div></div>
+            </div>
+            <div class="col-md-4 col-4 fade-up">
+                <div class="rome-card"><div class="card-body-inner text-center" style="padding:16px;">
+                    <div class="stat-value" style="color:var(--accent-green);">${data.today_copied}</div>
+                    <div class="stat-label">Copied</div>
+                </div></div>
+            </div>
+            <div class="col-md-4 col-4 fade-up">
+                <div class="rome-card"><div class="card-body-inner text-center" style="padding:16px;">
+                    <div class="stat-value" style="color:var(--accent-red);">${data.today_skipped}</div>
+                    <div class="stat-label">Skipped</div>
+                </div></div>
+            </div>
+        </div>
+    `;
+
+    if (data.signals.length === 0) {
+        html += `<div class="rome-card fade-up">
+            <div class="card-header-rome"><span class="title-text">Signal Feed</span></div>
+            <div class="card-body-inner" style="text-align:center; padding:40px;">
+                <div style="font-family:var(--font-serif); font-size:16px; font-style:italic; color:var(--text-dim);">
+                    Awaiting signals...<br>
+                    <span style="font-size:12px; font-family:var(--font-body);">Run <code style="color:var(--accent-gold); background:var(--bg-secondary); padding:2px 6px; border-radius:3px;">python main.py --monitor</code> to start watching wallets</span>
+                </div>
+            </div>
+        </div>`;
+    } else {
+        html += `<div class="rome-card fade-up">
+            <div class="card-header-rome">
+                <span class="title-text">Signal Feed</span>
+                <span class="count-text">${data.signals.length} signals</span>
+            </div>
+            <div class="card-body-inner" style="padding:0;">
+                ${data.signals.map(s => {
+                    const status = s.executed
+                        ? '<span style="color:var(--accent-green); font-weight:600; font-size:11px;">COPIED</span>'
+                        : s.skip_reason
+                            ? '<span style="color:var(--accent-red); font-size:11px;">SKIP: ' + s.skip_reason + '</span>'
+                            : '<span style="color:var(--accent-amber); font-size:11px;">PENDING</span>';
+                    const time = s.created_at ? s.created_at.split('T').pop().split('.')[0] : '\u2014';
+                    const walletTags = s.wallet_tags || [];
+                    return `
+                    <div class="signal-row">
+                        <div style="color:var(--text-dim); font-size:11px; white-space:nowrap;">${time}</div>
+                        <div>
+                            <span class="addr" style="cursor:pointer;" onclick="showWalletDetail('${s.wallet_address}')">${shortAddr(s.wallet_address)}</span>
+                            <span style="color:${scoreColor(s.wallet_total_score || 0)}; font-size:10px; font-weight:600; margin-left:4px;">${s.wallet_total_score ? s.wallet_total_score.toFixed(0) : ''}</span>
+                            ${renderTags(walletTags.slice(0, 2))}
+                        </div>
+                        <div>
+                            <span style="color:var(--accent-gold); font-weight:500;">${s.token_symbol || shortAddr(s.token_mint)}</span>
+                            <span class="badge badge-${s.signal_type === 'sell' ? 'sell' : 'buy'}" style="margin-left:4px;">${(s.signal_type || 'buy').toUpperCase()}</span>
+                        </div>
+                        <div style="text-align:right;">${status}</div>
+                    </div>`;
+                }).join('')}
+            </div>
+        </div>`;
     }
 
     el.innerHTML = html;
+    updateRefreshTimer();
+}
+
+// =========================================================================
+// JOURNAL TAB — Trade history grouped by wallet + performance
+// =========================================================================
+let journalPnlChart = null;
+
+async function loadJournal() {
+    const data = await fetchApi('/api/journal');
+    const el = document.getElementById('tab-journal');
+    if (!data) return;
+
+    let html = '';
+
+    // PnL Chart
+    html += `
+        <div class="rome-card mb-3 fade-up">
+            <div class="card-header-rome"><span class="title-text">PnL History</span></div>
+            <div class="chart-container"><canvas id="journalPnlChart"></canvas></div>
+        </div>
+    `;
+
+    // Performance by Wallet
+    if (data.wallet_performance.length > 0) {
+        html += `
+        <div class="rome-card mb-3 fade-up">
+            <div class="card-header-rome">
+                <span class="title-text">Copy Performance by Wallet</span>
+                <span class="count-text">${data.wallet_performance.length} wallets</span>
+            </div>
+            <div class="card-body-inner">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead><tr>
+                            <th>Wallet</th><th>Trades</th><th>Buys</th><th>Sells</th><th>Net PnL</th><th>Profitable?</th>
+                        </tr></thead>
+                        <tbody>
+                            ${data.wallet_performance.map(wp => `
+                            <tr onclick="showWalletDetail('${wp.triggered_by_wallet}')">
+                                <td><span class="addr">${shortAddr(wp.triggered_by_wallet)}</span></td>
+                                <td>${wp.total_trades}</td>
+                                <td>${wp.buys}</td>
+                                <td>${wp.sells}</td>
+                                <td>${fmtPnl(wp.net_pnl)}</td>
+                                <td>${wp.net_pnl > 0 ? '<span style="color:var(--accent-green); font-weight:600;">\u2713</span>' : '<span style="color:var(--accent-red);">\u2717</span>'}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // Full Trade Journal
+    if (data.trades.length > 0) {
+        html += `
+        <div class="rome-card fade-up">
+            <div class="card-header-rome">
+                <span class="title-text">Trade Journal</span>
+                <span class="count-text">${data.trades.length} entries</span>
+            </div>
+            <div class="card-body-inner">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead><tr>
+                            <th>Time</th><th>Token</th><th>Side</th><th>SOL</th><th>Wallet</th><th>Score</th><th>Status</th>
+                        </tr></thead>
+                        <tbody>
+                            ${data.trades.map(t => `
+                            <tr>
+                                <td style="white-space:nowrap; color:var(--text-dim);">${t.created_at ? t.created_at.split('T').pop().split('.')[0] : '\u2014'}</td>
+                                <td><span style="color:var(--accent-gold); cursor:pointer;" onclick="showTokenDetail('${t.token_mint}')">${t.token_symbol || shortAddr(t.token_mint)}</span></td>
+                                <td><span class="badge badge-${t.side}">${t.side.toUpperCase()}</span></td>
+                                <td>${fmt(t.amount_sol, 6)}</td>
+                                <td><span class="addr" style="cursor:pointer;" onclick="showWalletDetail('${t.triggered_by_wallet}')">${shortAddr(t.triggered_by_wallet)}</span></td>
+                                <td style="color:${scoreColor(t.wallet_score || 0)};">${t.wallet_score ? t.wallet_score.toFixed(0) : '\u2014'}</td>
+                                <td>${t.status}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+    } else {
+        html += `<div class="rome-card fade-up">
+            <div class="card-header-rome"><span class="title-text">Trade Journal</span></div>
+            <div class="card-body-inner" style="text-align:center; padding:40px;">
+                <div style="font-family:var(--font-serif); font-size:16px; font-style:italic; color:var(--text-dim);">
+                    No trades executed yet. Journal will populate once copy trading begins.
+                </div>
+            </div>
+        </div>`;
+    }
+
+    el.innerHTML = html;
+
+    // Render PnL chart for journal
+    if (data.daily_pnl && data.daily_pnl.length > 0) {
+        journalPnlChart = destroyChart(journalPnlChart);
+        const canvas = document.getElementById('journalPnlChart');
+        if (canvas) {
+            const days = data.daily_pnl;
+            let cumulative = 0;
+            const cumulativeData = days.map(d => { cumulative += d.total_pnl_sol; return cumulative; });
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+            gradient.addColorStop(0, 'rgba(184, 150, 12, 0.15)');
+            gradient.addColorStop(1, 'rgba(184, 150, 12, 0)');
+            journalPnlChart = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: days.map(d => d.date),
+                    datasets: [
+                        { label: 'Daily PnL', data: days.map(d => d.total_pnl_sol), borderColor: '#b8960c', backgroundColor: gradient, borderWidth: 2, pointRadius: 3, tension: 0.3, fill: true },
+                        { label: 'Cumulative', data: cumulativeData, borderColor: '#2d6b3f', backgroundColor: 'rgba(45,107,63,0.05)', borderWidth: 2, pointRadius: 2, tension: 0.3, fill: true }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { labels: { color: '#8a8070', font: { size: 11 } } } },
+                    scales: {
+                        x: { ticks: { color: '#8a8070' }, grid: { color: '#e8e0d0' } },
+                        y: { ticks: { color: '#8a8070' }, grid: { color: '#e8e0d0' } }
+                    }
+                }
+            });
+        }
+    }
     updateRefreshTimer();
 }
 
@@ -2486,7 +2595,7 @@ document.getElementById('splash')?.addEventListener('mousemove', (e) => {
 // =========================================================================
 // Initial Load & Auto-Refresh
 // =========================================================================
-loadOverview();
+loadCommandCenter();
 setInterval(() => loadTab(activeTab), 30000);
 </script>
 </body>

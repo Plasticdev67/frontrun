@@ -74,6 +74,11 @@ async def main() -> None:
     parser.add_argument("--clusters", action="store_true", help="Detect wallet clusters and side wallets")
     parser.add_argument("--dashboard", action="store_true", help="Launch web dashboard")
     parser.add_argument("--mode", choices=["live", "dry_run", "alert_only"], help="Override trading mode")
+    parser.add_argument("--import-smart-money", action="store_true", help="Import smart money wallets from GMGN")
+    parser.add_argument("--add-wallet", type=str, nargs="+", help="Add wallet address(es) manually")
+    parser.add_argument("--source", type=str, default="manual", help="Source label for --add-wallet (fomo, gmgn, manual)")
+    parser.add_argument("--wipe-wallets", action="store_true", help="Delete all wallets and start fresh")
+    parser.add_argument("--yes", action="store_true", help="Skip confirmation prompts")
     args = parser.parse_args()
 
     # Override trading mode if specified
@@ -116,7 +121,154 @@ async def main() -> None:
     # =========================================================================
 
     try:
-        if args.discover:
+        # =================================================================
+        # Wallet Management Commands
+        # =================================================================
+
+        if args.wipe_wallets:
+            # Wipe all wallet data to start fresh
+            if not args.yes:
+                confirm = input("This will DELETE all wallets, token trades, and clusters. Type 'yes' to confirm: ")
+                if confirm.lower() != "yes":
+                    print("Aborted.")
+                    return
+            counts = await db.wipe_wallets()
+            total = sum(counts.values())
+            logger.info("wallets_wiped", **counts)
+            print(f"\nWiped {total} records:")
+            for table, count in counts.items():
+                print(f"  {table}: {count} rows deleted")
+            print("\nDatabase is clean. Run --import-smart-money to populate with fresh data.")
+            return
+
+        elif args.add_wallet:
+            # Manually add wallet(s) with GMGN enrichment
+            from discovery.gmgn_client import GMGNClient
+
+            gmgn = GMGNClient(
+                cf_clearance=settings.gmgn_cf_clearance,
+                cf_bm=settings.gmgn_cf_bm,
+            )
+
+            source = args.source.lower()
+            added = 0
+
+            for address in args.add_wallet:
+                address = address.strip()
+                if len(address) < 30:
+                    print(f"  Skipping invalid address: {address}")
+                    continue
+
+                print(f"  Enriching {address[:8]}...{address[-4:]} via GMGN...")
+                stats = await gmgn.get_wallet_stats(address)
+
+                def _f(val, default=0.0):
+                    if val is None: return default
+                    try: return float(val)
+                    except (ValueError, TypeError): return default
+
+                profit_30d = _f(stats.get("realized_profit_30d"))
+                winrate = stats.get("winrate")
+                tags = stats.get("tags") or []
+                if isinstance(tags, str):
+                    import json as _json
+                    try: tags = _json.loads(tags)
+                    except: tags = []
+
+                wallet_data = {
+                    "address": address,
+                    "source": source,
+                    "total_score": 50,  # Baseline — manually added wallets start at 50
+                    "gmgn_realized_profit_usd": _f(stats.get("realized_profit")),
+                    "gmgn_profit_30d_usd": profit_30d,
+                    "gmgn_sol_balance": _f(stats.get("sol_balance")),
+                    "gmgn_winrate": _f(winrate) if winrate is not None else None,
+                    "gmgn_buy_30d": int(_f(stats.get("buy_30d"))),
+                    "gmgn_sell_30d": int(_f(stats.get("sell_30d"))),
+                    "gmgn_tags": tags,
+                    "is_monitored": True,
+                }
+                await db.upsert_wallet(wallet_data)
+                added += 1
+
+                wr_display = f"{_f(winrate)*100:.0f}%" if winrate is not None else "—"
+                print(f"  ✓ Added {address[:8]}...{address[-4:]} | 30D: ${profit_30d:,.0f} | WR: {wr_display} | Source: {source.upper()}")
+
+            gmgn.close()
+            print(f"\nDone. Added {added} wallet(s) — all set to MONITORED.")
+            return
+
+        elif getattr(args, "import_smart_money", False):
+            # Import smart money wallets from GMGN
+            logger.info("mode_import_smart_money")
+            from discovery.gmgn_client import GMGNClient
+
+            gmgn = GMGNClient(
+                cf_clearance=settings.gmgn_cf_clearance,
+                cf_bm=settings.gmgn_cf_bm,
+            )
+
+            if not gmgn.is_authenticated:
+                print("ERROR: GMGN cookies not set. Add GMGN_CF_CLEARANCE and GMGN_CF_BM to .env")
+                print("  1. Go to https://gmgn.ai in Chrome")
+                print("  2. DevTools → Application → Cookies → gmgn.ai")
+                print("  3. Copy cf_clearance and __cf_bm values to .env")
+                gmgn.close()
+                return
+
+            print("Scanning GMGN for smart money wallets...")
+            print(f"  Filters: profit_30d > ${settings.sm_min_profit_30d_usd:,.0f}, "
+                  f"winrate > {settings.sm_min_winrate*100:.0f}%, "
+                  f"buys > {settings.sm_min_buys_30d}, "
+                  f"balance > {settings.sm_min_sol_balance} SOL")
+
+            wallets = await gmgn.get_smart_money_wallets(
+                min_profit_30d=settings.sm_min_profit_30d_usd,
+                min_winrate=settings.sm_min_winrate,
+                min_buys_30d=settings.sm_min_buys_30d,
+                max_buys_30d=settings.sm_max_buys_30d,
+                min_sol_balance=settings.sm_min_sol_balance,
+            )
+            gmgn.close()
+
+            if not wallets:
+                print("\nNo wallets passed filters. Try lowering thresholds in .env:")
+                print("  SM_MIN_PROFIT_30D_USD=500")
+                print("  SM_MIN_WINRATE=0.3")
+                return
+
+            # Save to database
+            monitored_count = 0
+            for i, w in enumerate(wallets):
+                w["source"] = "gmgn"
+                w["total_score"] = 50  # Baseline — will be refined by --analyze
+                # Auto-monitor top N
+                if i < settings.sm_auto_monitor_top:
+                    w["is_monitored"] = True
+                    monitored_count += 1
+                else:
+                    w["is_monitored"] = False
+                await db.upsert_wallet(w)
+
+            print(f"\n{'='*60}")
+            print(f"  Smart Money Import Complete")
+            print(f"  Total passed filters: {len(wallets)}")
+            print(f"  Auto-monitored: {monitored_count}")
+            print(f"{'='*60}")
+            print(f"\nTop 5 wallets:")
+            for i, w in enumerate(wallets[:5]):
+                wr = w.get("gmgn_winrate")
+                wr_str = f"{wr*100:.0f}%" if wr is not None else "—"
+                tags = w.get("gmgn_tags", [])
+                tag_str = ", ".join(tags[:3]) if tags else "—"
+                print(f"  {i+1}. {w['address'][:8]}...{w['address'][-4:]} | "
+                      f"30D: ${w['gmgn_profit_30d_usd']:,.0f} | "
+                      f"WR: {wr_str} | "
+                      f"Tags: {tag_str}")
+            print(f"\nRefresh dashboard to see them in Smart Money tab.")
+            return
+
+        elif args.discover:
             # Stage 1: Run token discovery only
             # Finds the best-performing Solana tokens from the last 30 days
             logger.info("mode_discovery_only")

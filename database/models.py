@@ -81,6 +81,9 @@ CREATE TABLE IF NOT EXISTS wallets (
     gmgn_sell_30d INTEGER DEFAULT 0,            -- Number of sells in last 30 days
     gmgn_tags TEXT,                              -- JSON array of tags: smart_degen, sniper, whale, etc.
 
+    -- Discovery source
+    source TEXT DEFAULT 'manual',          -- Where we found this wallet: fomo, gmgn, manual, cluster
+
     -- Flags
     is_flagged BOOLEAN DEFAULT FALSE,      -- True if this wallet looks suspicious
     flag_reason TEXT,                       -- Why it was flagged (bot, insider, dev, etc.)

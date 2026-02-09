@@ -75,6 +75,7 @@ class Database:
             ("wallets", "gmgn_buy_30d", "INTEGER DEFAULT 0"),
             ("wallets", "gmgn_sell_30d", "INTEGER DEFAULT 0"),
             ("wallets", "gmgn_tags", "TEXT"),
+            ("wallets", "source", "TEXT DEFAULT 'manual'"),
         ]
         for table, column, col_type in migrations:
             try:
@@ -173,8 +174,8 @@ class Database:
                 win_rate, avg_entry_rank, unique_winners,
                 gmgn_realized_profit_usd, gmgn_profit_30d_usd, gmgn_sol_balance,
                 gmgn_winrate, gmgn_buy_30d, gmgn_sell_30d, gmgn_tags,
-                is_flagged, flag_reason, is_monitored, last_active, score_updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                source, is_flagged, flag_reason, is_monitored, last_active, score_updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(address) DO UPDATE SET
                 total_score = excluded.total_score,
                 pnl_score = excluded.pnl_score,
@@ -194,6 +195,7 @@ class Database:
                 gmgn_buy_30d = excluded.gmgn_buy_30d,
                 gmgn_sell_30d = excluded.gmgn_sell_30d,
                 gmgn_tags = excluded.gmgn_tags,
+                source = excluded.source,
                 is_flagged = excluded.is_flagged,
                 flag_reason = excluded.flag_reason,
                 is_monitored = excluded.is_monitored,
@@ -226,6 +228,7 @@ class Database:
             wallet_data.get("gmgn_buy_30d", 0),
             wallet_data.get("gmgn_sell_30d", 0),
             tags_json,
+            wallet_data.get("source", "manual"),
             wallet_data.get("is_flagged", False),
             wallet_data.get("flag_reason"),
             wallet_data.get("is_monitored", False),
@@ -590,3 +593,18 @@ class Database:
         cursor = await self.connection.execute(sql, (wallet_address,))
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+
+    async def wipe_wallets(self) -> dict:
+        """
+        Delete all wallet-related data to start fresh.
+        Preserves: tokens, signals, trades, positions, daily_stats.
+        Returns counts of deleted rows for reporting.
+        """
+        counts = {}
+        for table in ["wallet_cluster_members", "wallet_clusters", "wallet_token_trades", "wallets"]:
+            cursor = await self.connection.execute(f"SELECT COUNT(*) as c FROM {table}")
+            row = await cursor.fetchone()
+            counts[table] = row["c"] if row else 0
+            await self.connection.execute(f"DELETE FROM {table}")
+        await self.connection.commit()
+        return counts

@@ -150,8 +150,9 @@ class WalletScorer:
                 winning_trades = int(effective_win_rate * gmgn_buy_30d) if gmgn_buy_30d else winning_trades
             except (ValueError, TypeError):
                 pass
-        # If GMGN shows high trade volume, boost the trade count
-        if gmgn_buy_30d > effective_total_trades:
+        # If GMGN shows higher trade volume, use it — but cap at a human-realistic level
+        # >15,000 buys in 30d = 500/day = clearly a bot, don't inflate our trade count
+        if gmgn_buy_30d > effective_total_trades and gmgn_buy_30d <= 15_000:
             effective_total_trades = gmgn_buy_30d
 
         # Store win rate as a 0-100 percentage for display
