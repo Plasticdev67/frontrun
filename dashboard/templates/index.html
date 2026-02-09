@@ -1,50 +1,447 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Copy Trading Dashboard</title>
+    <title>SOLANA COPY TRADER // TERMINAL</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
-        body { background: #0d1117; color: #c9d1d9; }
-        .stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; }
-        .stat-value { font-size: 1.8rem; font-weight: 700; }
-        .stat-label { color: #8b949e; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
-        .pnl-positive { color: #3fb950; }
-        .pnl-negative { color: #f85149; }
-        .badge-monitored { background: #1f6feb; }
-        .badge-flagged { background: #f85149; }
-        .badge-open { background: #3fb950; }
-        .badge-closed { background: #8b949e; }
-        .badge-buy { background: #3fb950; }
-        .badge-sell { background: #f0883e; }
-        .table { color: #c9d1d9; }
-        .table thead th { border-color: #30363d; color: #8b949e; font-size: 0.8rem; text-transform: uppercase; }
-        .table td { border-color: #21262d; vertical-align: middle; }
-        .nav-pills .nav-link { color: #8b949e; border-radius: 8px; }
-        .nav-pills .nav-link.active { background: #1f6feb; color: #fff; }
-        .addr { font-family: monospace; font-size: 0.85rem; }
-        .header-bar { background: #161b22; border-bottom: 1px solid #30363d; padding: 12px 0; margin-bottom: 24px; }
-        .score-bar { height: 6px; border-radius: 3px; background: #21262d; }
-        .score-fill { height: 100%; border-radius: 3px; }
-        #pnlChart { max-height: 250px; }
-        .empty-state { text-align: center; padding: 60px 20px; color: #8b949e; }
-        .empty-state h5 { color: #c9d1d9; }
+        /* ========================================
+           CSS CUSTOM PROPERTIES
+           ======================================== */
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #001a00;
+            --bg-card: #0d1a0d;
+            --border-color: #00ff41;
+            --border-dim: #004400;
+            --text-primary: #00ff41;
+            --text-secondary: #00aa2a;
+            --text-dim: #006600;
+            --accent-green: #00ff41;
+            --accent-amber: #ffb000;
+            --accent-red: #ff0040;
+            --glow-green: 0 0 10px #00ff41, 0 0 20px rgba(0,255,65,0.25);
+            --glow-amber: 0 0 10px #ffb000, 0 0 20px rgba(255,176,0,0.25);
+            --glow-red: 0 0 10px #ff0040, 0 0 20px rgba(255,0,64,0.25);
+            --font-mono: 'Fira Code', 'Courier New', monospace;
+        }
+
+        /* ========================================
+           GLOBAL RESET & BODY
+           ======================================== */
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 13px;
+            line-height: 1.6;
+            overflow-x: hidden;
+            margin: 0;
+        }
+
+        /* ========================================
+           CRT SCANLINE OVERLAY
+           ======================================== */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15) 0px,
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 3px
+            );
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* ========================================
+           SCROLLBAR
+           ======================================== */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-dim); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+        /* ========================================
+           TICKER BAR
+           ======================================== */
+        .ticker-bar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-dim);
+            overflow: hidden;
+            white-space: nowrap;
+            height: 32px;
+            line-height: 32px;
+            font-size: 12px;
+            position: relative;
+        }
+        .ticker-content {
+            display: inline-block;
+            padding-left: 100%;
+            animation: ticker-scroll 40s linear infinite;
+        }
+        @keyframes ticker-scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+
+        /* ========================================
+           HEADER BAR
+           ======================================== */
+        .header-bar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-dim);
+            padding: 12px 0;
+            margin-bottom: 0;
+        }
+        .ascii-logo {
+            color: var(--accent-green);
+            font-size: 9px;
+            line-height: 1.1;
+            text-shadow: var(--glow-green);
+            margin: 0;
+            white-space: pre;
+        }
+
+        /* ========================================
+           NAVIGATION PILLS
+           ======================================== */
+        .nav-pills { margin-top: 16px; margin-bottom: 16px; }
+        .nav-pills .nav-link {
+            color: var(--text-dim);
+            border: 1px solid transparent;
+            border-radius: 0;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 8px 16px;
+            transition: all 0.2s;
+        }
+        .nav-pills .nav-link:hover {
+            color: var(--text-primary);
+            border-color: var(--border-dim);
+            background: transparent;
+        }
+        .nav-pills .nav-link.active {
+            background: transparent;
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+            text-shadow: var(--glow-green);
+            box-shadow: 0 0 10px rgba(0,255,65,0.1);
+        }
+
+        /* ========================================
+           TERMINAL CARDS
+           ======================================== */
+        .terminal-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dim);
+            border-radius: 0;
+            margin-bottom: 16px;
+        }
+        .card-titlebar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-dim);
+            padding: 4px 12px;
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-titlebar .title-text::before { content: '[ '; }
+        .card-titlebar .title-text::after { content: ' ]'; }
+        .card-body-inner { padding: 16px; }
+
+        /* ========================================
+           STAT VALUES & LABELS
+           ======================================== */
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent-green);
+            text-shadow: var(--glow-green);
+            font-family: var(--font-mono);
+        }
+        .stat-label {
+            color: var(--text-dim);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .stat-mini {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dim);
+            padding: 12px 16px;
+            text-align: center;
+        }
+
+        /* ========================================
+           PNL COLORS
+           ======================================== */
+        .pnl-positive { color: var(--accent-green); text-shadow: var(--glow-green); }
+        .pnl-negative { color: var(--accent-red); text-shadow: var(--glow-red); }
+
+        /* ========================================
+           TABLE STYLES
+           ======================================== */
+        .table {
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            border-collapse: collapse;
+            --bs-table-bg: transparent;
+            --bs-table-color: var(--text-primary);
+            --bs-table-border-color: #001a00;
+            --bs-table-hover-bg: rgba(0,255,65,0.05);
+            --bs-table-hover-color: var(--text-primary);
+        }
+        .table thead th {
+            border-bottom: 1px solid var(--border-dim);
+            color: var(--text-dim);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 8px;
+            font-weight: 400;
+        }
+        .table td {
+            border-bottom: 1px solid #001a00;
+            padding: 6px 8px;
+            vertical-align: middle;
+        }
+        .table-hover tbody tr:hover { cursor: pointer; }
+        .table-hover tbody tr:hover td { color: #fff; }
+
+        /* ========================================
+           BADGES
+           ======================================== */
+        .badge-buy { background: var(--accent-green) !important; color: #000 !important; font-weight: 600; }
+        .badge-sell { background: var(--accent-amber) !important; color: #000 !important; font-weight: 600; }
+        .badge-open { background: var(--accent-green) !important; color: #000 !important; }
+        .badge-closed { background: var(--text-dim) !important; }
+        .badge-monitored {
+            background: transparent !important;
+            border: 1px solid var(--accent-green);
+            color: var(--accent-green) !important;
+        }
+        .badge-flagged {
+            background: transparent !important;
+            border: 1px solid var(--accent-red);
+            color: var(--accent-red) !important;
+        }
+        .badge-mode-live { background: var(--accent-red) !important; color: #fff !important; text-shadow: var(--glow-red); }
+        .badge-mode-dry { background: var(--accent-amber) !important; color: #000 !important; }
+        .badge-mode-alert { background: var(--text-dim) !important; }
+
+        /* ========================================
+           PULSE DOT
+           ======================================== */
+        .pulse-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 6px var(--accent-green);
+            animation: pulse-breathe 2s ease-in-out infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .pulse-dot-amber {
+            background: var(--accent-amber);
+            box-shadow: 0 0 6px var(--accent-amber);
+        }
+        @keyframes pulse-breathe {
+            0%, 100% { opacity: 1; box-shadow: 0 0 6px currentColor; }
+            50% { opacity: 0.4; box-shadow: 0 0 2px currentColor; }
+        }
+
+        /* ========================================
+           BLINK CURSOR
+           ======================================== */
+        .blink-cursor::after {
+            content: '█';
+            animation: blink 1s step-end infinite;
+            color: var(--accent-green);
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        /* ========================================
+           SCORE BARS
+           ======================================== */
+        .score-bar {
+            height: 4px;
+            background: #001a00;
+            margin-top: 4px;
+        }
+        .score-fill {
+            height: 100%;
+            box-shadow: 0 0 4px currentColor;
+            transition: width 0.5s ease;
+        }
+
+        /* ========================================
+           ADDRESS STYLES
+           ======================================== */
+        .addr {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        .addr-copy {
+            cursor: pointer;
+            border-bottom: 1px dashed var(--text-dim);
+            transition: color 0.2s;
+        }
+        .addr-copy:hover { color: var(--accent-green); }
+
+        /* ========================================
+           LOADING & EMPTY STATES
+           ======================================== */
+        .loading-text {
+            color: var(--text-dim);
+            animation: blink 1s step-end infinite;
+            text-align: center;
+            padding: 40px;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-dim);
+        }
+        .empty-state h5 { color: var(--text-secondary); }
+        .empty-state code {
+            color: var(--accent-green);
+            background: var(--bg-secondary);
+            padding: 2px 8px;
+            border: 1px solid var(--border-dim);
+        }
+
+        /* ========================================
+           MODAL
+           ======================================== */
+        .terminal-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 5000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.15s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .terminal-modal {
+            background: var(--bg-primary);
+            border: 1px solid var(--accent-green);
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.2), 0 0 60px rgba(0, 255, 65, 0.05);
+            width: 90%;
+            max-width: 850px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-titlebar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-dim);
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .modal-close {
+            color: var(--accent-red);
+            cursor: pointer;
+            font-size: 12px;
+            background: none;
+            border: 1px solid var(--accent-red);
+            font-family: var(--font-mono);
+            padding: 2px 8px;
+            transition: all 0.2s;
+        }
+        .modal-close:hover {
+            background: var(--accent-red);
+            color: #000;
+        }
+        .modal-body-inner { padding: 20px; }
+
+        /* ========================================
+           CHART CONTAINERS
+           ======================================== */
+        .chart-container { position: relative; padding: 12px; }
+        .chart-container canvas { max-height: 250px; }
+        .chart-small canvas { max-height: 200px; }
+
+        /* ========================================
+           RESPONSIVE
+           ======================================== */
+        @media (max-width: 768px) {
+            .ascii-logo { display: none; }
+            .stat-value { font-size: 1.2rem; }
+        }
     </style>
 </head>
 <body>
+
+<!-- Matrix Rain Canvas Background -->
+<canvas id="matrix-rain" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:-1; opacity:0.04; pointer-events:none;"></canvas>
+
+<!-- Trade Ticker -->
+<div class="ticker-bar">
+    <div class="ticker-content" id="ticker-content">
+        INITIALIZING TRADE FEED . . .
+    </div>
+</div>
 
 <!-- Header -->
 <div class="header-bar">
     <div class="container-fluid px-4">
         <div class="d-flex justify-content-between align-items-center">
             <div>
-                <h5 class="mb-0">Solana Copy Trading Bot</h5>
+                <pre class="ascii-logo"> ____   ___  _        _    _   _    _        ____ ___  ______   __
+/ ___| / _ \| |      / \  | \ | |  / \      / ___/ _ \|  _ \ \ / /
+\___ \| | | | |     / _ \ |  \| | / _ \    | |  | | | | |_) \ V /
+ ___) | |_| | |___ / ___ \| |\  |/ ___ \   | |__| |_| |  __/ | |
+|____/ \___/|_____/_/   \_\_| \_/_/   \_\   \____\___/|_|    |_|</pre>
             </div>
-            <div>
-                <span id="mode-badge" class="badge bg-secondary me-2">—</span>
-                <span id="status-badge" class="badge bg-secondary">—</span>
+            <div style="text-align: right; min-width: 200px;">
+                <div>
+                    <span class="pulse-dot" id="status-dot"></span>
+                    <span id="status-text" style="font-size: 13px; letter-spacing: 1px;">INITIALIZING</span>
+                </div>
+                <div style="margin-top: 6px;">
+                    <span id="mode-badge" style="font-size: 11px; color: var(--accent-amber); letter-spacing: 1px;">---</span>
+                </div>
+                <div style="margin-top: 6px; font-size: 10px; color: var(--text-dim);" id="last-refresh">
+                    LAST SYNC: --:--:--
+                </div>
             </div>
         </div>
     </div>
@@ -52,21 +449,21 @@
 
 <div class="container-fluid px-4">
     <!-- Navigation Tabs -->
-    <ul class="nav nav-pills mb-4" id="mainTabs">
+    <ul class="nav nav-pills" id="mainTabs">
         <li class="nav-item">
-            <a class="nav-link active" href="#" data-tab="overview">Overview</a>
+            <a class="nav-link active" href="#" data-tab="overview">&gt; overview</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="wallets">Wallets</a>
+            <a class="nav-link" href="#" data-tab="wallets">&gt; wallets</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="tokens">Tokens</a>
+            <a class="nav-link" href="#" data-tab="tokens">&gt; tokens</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="trades">Trades</a>
+            <a class="nav-link" href="#" data-tab="trades">&gt; trades</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="positions">Positions</a>
+            <a class="nav-link" href="#" data-tab="positions">&gt; positions</a>
         </li>
     </ul>
 
@@ -78,14 +475,61 @@
     <div id="tab-positions" style="display:none"></div>
 </div>
 
+<!-- Modal Container -->
+<div id="modal-container"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+// =========================================================================
+// Chart.js Global Defaults — Terminal Theme
+// =========================================================================
+Chart.defaults.color = '#006600';
+Chart.defaults.font.family = "'Fira Code', monospace";
+Chart.defaults.font.size = 11;
+
+// =========================================================================
+// Matrix Rain Background
+// =========================================================================
+function initMatrixRain() {
+    const canvas = document.getElementById('matrix-rain');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const chars = 'アイウエオカキクケコサシスセソタチツテト0123456789ABCDEF';
+    const fontSize = 14;
+    let columns = Math.floor(canvas.width / fontSize);
+    let drops = Array(columns).fill(1);
+
+    function draw() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#00ff41';
+        ctx.font = fontSize + 'px monospace';
+        for (let i = 0; i < drops.length; i++) {
+            const text = chars[Math.floor(Math.random() * chars.length)];
+            ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+            if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                drops[i] = 0;
+            }
+            drops[i]++;
+        }
+    }
+    setInterval(draw, 50);
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        columns = Math.floor(canvas.width / fontSize);
+        drops = Array(columns).fill(1);
+    });
+}
+initMatrixRain();
+
 // =========================================================================
 // Tab Navigation
 // =========================================================================
 const tabs = document.querySelectorAll('[data-tab]');
 let activeTab = 'overview';
-let pnlChart = null;
 
 tabs.forEach(tab => {
     tab.addEventListener('click', (e) => {
@@ -109,7 +553,7 @@ function fmt(n, decimals = 4) {
 }
 
 function fmtPnl(n) {
-    if (n === null || n === undefined) return '—';
+    if (n === null || n === undefined) return '<span style="color:var(--text-dim)">—</span>';
     const v = Number(n);
     const cls = v >= 0 ? 'pnl-positive' : 'pnl-negative';
     const sign = v >= 0 ? '+' : '';
@@ -117,7 +561,7 @@ function fmtPnl(n) {
 }
 
 function fmtUsd(n) {
-    if (!n) return '—';
+    if (!n) return '<span style="color:var(--text-dim)">—</span>';
     const v = Number(n);
     if (v >= 1_000_000) return '$' + (v / 1_000_000).toFixed(2) + 'M';
     if (v >= 1_000) return '$' + (v / 1_000).toFixed(1) + 'K';
@@ -127,18 +571,598 @@ function fmtUsd(n) {
 
 function shortAddr(addr) {
     if (!addr || addr.length < 12) return addr || '—';
-    return addr.slice(0, 6) + '...' + addr.slice(-4);
+    return addr.slice(0, 6) + '···' + addr.slice(-4);
 }
 
 function scoreColor(score) {
-    if (score >= 80) return '#3fb950';
-    if (score >= 60) return '#f0883e';
-    return '#f85149';
+    if (score >= 80) return '#00ff41';
+    if (score >= 60) return '#00aa2a';
+    if (score >= 40) return '#ffb000';
+    return '#ff0040';
 }
 
 async function fetchApi(endpoint) {
-    const res = await fetch(endpoint);
-    return res.json();
+    try {
+        const res = await fetch(endpoint);
+        if (!res.ok) return null;
+        return res.json();
+    } catch (e) {
+        return null;
+    }
+}
+
+function updateRefreshTimer() {
+    const now = new Date();
+    document.getElementById('last-refresh').textContent =
+        'LAST SYNC: ' + now.toLocaleTimeString('en-US', { hour12: false });
+}
+
+// =========================================================================
+// Animated Number Counter
+// =========================================================================
+function animateCounter(elementId, newValue, decimals = 4) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    const start = parseFloat(el.dataset.val || '0');
+    const end = newValue;
+    const startTime = performance.now();
+    const duration = 600;
+    el.dataset.val = end;
+
+    function update(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = start + (end - start) * eased;
+        el.textContent = current.toFixed(decimals);
+        if (progress < 1) requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+}
+
+// =========================================================================
+// Ticker
+// =========================================================================
+function updateTicker(trades) {
+    const el = document.getElementById('ticker-content');
+    if (!trades || trades.length === 0) {
+        el.innerHTML = '[ NO RECENT TRADES ] &nbsp;&nbsp;&nbsp; AWAITING SIGNALS . . .';
+        return;
+    }
+    const items = trades.map(t => {
+        const side = t.side.toUpperCase();
+        const symbol = t.token_symbol || 'UNKNOWN';
+        const amount = Number(t.amount_sol).toFixed(4);
+        const color = t.side === 'buy' ? 'var(--accent-green)' : 'var(--accent-amber)';
+        const time = t.created_at ? t.created_at.split('T').pop().split('.')[0] : '';
+        return `<span style="color:${color}">${side}</span> ${symbol} ${amount} SOL <span style="color:var(--text-dim)">${time}</span>`;
+    });
+    el.innerHTML = items.join(' &nbsp;│&nbsp; ') + ' &nbsp;│&nbsp; ' + items.join(' &nbsp;│&nbsp; ');
+    // Adjust speed based on content
+    el.style.animationDuration = Math.max(20, items.length * 4) + 's';
+}
+
+// =========================================================================
+// Copy to Clipboard
+// =========================================================================
+function copyAddr(address, event) {
+    if (event) event.stopPropagation();
+    navigator.clipboard.writeText(address).then(() => {
+        const el = event ? event.target : null;
+        if (el) {
+            const orig = el.textContent;
+            el.textContent = 'COPIED!';
+            el.style.color = 'var(--accent-green)';
+            setTimeout(() => { el.textContent = orig; el.style.color = ''; }, 1000);
+        }
+    });
+}
+
+// =========================================================================
+// Modal System
+// =========================================================================
+function showModal(titleText, bodyHTML) {
+    document.getElementById('modal-container').innerHTML = `
+        <div class="terminal-modal-overlay" onclick="closeModal(event)">
+            <div class="terminal-modal" onclick="event.stopPropagation()">
+                <div class="modal-titlebar">
+                    <span>[ ${titleText} ]</span>
+                    <button class="modal-close" onclick="closeModal()">[X] CLOSE</button>
+                </div>
+                <div class="modal-body-inner">${bodyHTML}</div>
+            </div>
+        </div>
+    `;
+}
+
+function closeModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById('modal-container').innerHTML = '';
+}
+
+// Close modal on Escape
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.getElementById('modal-container').innerHTML = '';
+});
+
+// =========================================================================
+// Score Bar Renderer
+// =========================================================================
+function renderScoreBar(label, score) {
+    const s = score || 0;
+    const color = scoreColor(s);
+    return `
+        <div style="margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; font-size:10px;">
+                <span style="color:var(--text-dim)">${label}</span>
+                <span style="color:${color}">${s.toFixed(0)}</span>
+            </div>
+            <div class="score-bar"><div class="score-fill" style="width:${s}%; background:${color}; color:${color};"></div></div>
+        </div>
+    `;
+}
+
+// =========================================================================
+// Wallet Detail Modal
+// =========================================================================
+async function showWalletDetail(address) {
+    showModal('LOADING', '<div class="loading-text">QUERYING WALLET DATA . . .</div>');
+    const data = await fetchApi('/api/wallet/' + encodeURIComponent(address));
+    if (!data || !data.wallet) { closeModal(); return; }
+
+    const w = data.wallet;
+    let html = `
+        <div style="margin-bottom:20px;">
+            <div style="color:var(--text-dim); font-size:10px; letter-spacing:2px;">WALLET ADDRESS</div>
+            <div class="addr-copy" onclick="copyAddr('${w.address}', event)"
+                 style="font-size:13px; word-break:break-all; margin-top:4px;">
+                ${w.address} <span style="color:var(--text-dim); font-size:9px;">[CLICK TO COPY]</span>
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+            ${renderScoreBar('PNL SCORE', w.pnl_score)}
+            ${renderScoreBar('WIN RATE', w.win_rate_score)}
+            ${renderScoreBar('TIMING', w.timing_score)}
+            ${renderScoreBar('CONSISTENCY', w.consistency_score)}
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:20px;">
+            <div class="stat-mini">
+                <div class="stat-label">TOTAL SCORE</div>
+                <div style="font-size:1.4rem; font-weight:700; color:${scoreColor(w.total_score)}; text-shadow:0 0 10px ${scoreColor(w.total_score)};">${w.total_score.toFixed(0)}</div>
+            </div>
+            <div class="stat-mini">
+                <div class="stat-label">TOTAL PNL</div>
+                <div style="font-size:1rem;">${fmtPnl(w.total_pnl_sol)}</div>
+            </div>
+            <div class="stat-mini">
+                <div class="stat-label">WIN RATE</div>
+                <div style="font-size:1.4rem; font-weight:700; color:var(--accent-green);">${w.win_rate.toFixed(0)}%</div>
+            </div>
+            <div class="stat-mini">
+                <div class="stat-label">TRADES</div>
+                <div style="font-size:1.4rem; font-weight:700; color:var(--text-secondary);">${w.total_trades}</div>
+            </div>
+        </div>
+    `;
+
+    // Token trades
+    if (data.token_trades.length > 0) {
+        html += `
+            <div style="color:var(--text-dim); font-size:10px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-dim); padding-bottom:4px;">
+                TOKEN TRADES (${data.token_trades.length})
+            </div>
+            <div class="table-responsive" style="margin-bottom:20px;">
+                <table class="table table-sm mb-0">
+                    <thead><tr>
+                        <th>Token</th><th>Buy SOL</th><th>Sell SOL</th><th>PnL</th><th>Entry Rank</th>
+                    </tr></thead>
+                    <tbody>
+                        ${data.token_trades.map(t => `
+                        <tr>
+                            <td>${t.token_symbol || shortAddr(t.token_mint)}</td>
+                            <td>${fmt(t.buy_amount_sol, 4)}</td>
+                            <td>${fmt(t.sell_amount_sol, 4)}</td>
+                            <td>${fmtPnl(t.pnl_sol)}</td>
+                            <td>${t.entry_rank || '—'}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // Copy trades
+    if (data.copy_trades.length > 0) {
+        html += `
+            <div style="color:var(--text-dim); font-size:10px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-dim); padding-bottom:4px;">
+                COPY TRADES TRIGGERED (${data.copy_trades.length})
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead><tr>
+                        <th>Token</th><th>Side</th><th>SOL</th><th>Price</th><th>Status</th><th>Time</th>
+                    </tr></thead>
+                    <tbody>
+                        ${data.copy_trades.map(t => `
+                        <tr>
+                            <td>${t.token_symbol || shortAddr(t.token_mint)}</td>
+                            <td><span class="badge badge-${t.side}">${t.side.toUpperCase()}</span></td>
+                            <td>${fmt(t.amount_sol, 6)}</td>
+                            <td>${fmtUsd(t.price_usd)}</td>
+                            <td>${t.status}</td>
+                            <td style="white-space:nowrap">${t.created_at || '—'}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    showModal('WALLET :: ' + shortAddr(w.address), html);
+}
+
+// =========================================================================
+// Token Detail Modal
+// =========================================================================
+async function showTokenDetail(mint) {
+    showModal('LOADING', '<div class="loading-text">QUERYING TOKEN DATA . . .</div>');
+    const data = await fetchApi('/api/token/' + encodeURIComponent(mint));
+    if (!data || !data.token) { closeModal(); return; }
+
+    const t = data.token;
+    let html = `
+        <div style="margin-bottom:20px;">
+            <div style="display:flex; align-items:baseline; gap:12px;">
+                <span style="font-size:1.4rem; font-weight:700; color:var(--accent-green); text-shadow:var(--glow-green);">${t.symbol || '???'}</span>
+                <span style="color:var(--text-dim); font-size:12px;">${t.name || ''}</span>
+            </div>
+            <div class="addr-copy" onclick="copyAddr('${t.mint_address}', event)"
+                 style="font-size:11px; word-break:break-all; margin-top:4px; color:var(--text-dim);">
+                ${t.mint_address} <span style="font-size:9px;">[CLICK TO COPY]</span>
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:20px;">
+            <div class="stat-mini">
+                <div class="stat-label">MARKET CAP</div>
+                <div style="font-size:1.1rem; color:var(--text-secondary);">${fmtUsd(t.market_cap_usd)}</div>
+            </div>
+            <div class="stat-mini">
+                <div class="stat-label">PRICE</div>
+                <div style="font-size:1.1rem; color:var(--accent-green);">${fmtUsd(t.price_usd)}</div>
+            </div>
+            <div class="stat-mini">
+                <div class="stat-label">LIQUIDITY</div>
+                <div style="font-size:1.1rem; color:var(--text-secondary);">${fmtUsd(t.liquidity_usd)}</div>
+            </div>
+            <div class="stat-mini">
+                <div class="stat-label">MULTIPLIER</div>
+                <div style="font-size:1.1rem; color:var(--accent-green); text-shadow:var(--glow-green);">
+                    ${t.price_multiplier ? t.price_multiplier.toFixed(1) + 'x' : '—'}
+                </div>
+            </div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:20px;">
+            <div class="stat-mini">
+                <div class="stat-label">VOL 24H</div>
+                <div style="color:var(--text-secondary);">${fmtUsd(t.volume_24h_usd)}</div>
+            </div>
+            <div class="stat-mini">
+                <div class="stat-label">HOLDERS</div>
+                <div style="color:var(--text-secondary);">${t.holder_count || '—'}</div>
+            </div>
+            <div class="stat-mini">
+                <div class="stat-label">SOURCE</div>
+                <div style="color:var(--accent-amber);">${t.data_source || '—'}</div>
+            </div>
+        </div>
+    `;
+
+    // Wallets that traded this token
+    if (data.wallet_trades.length > 0) {
+        html += `
+            <div style="color:var(--text-dim); font-size:10px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-dim); padding-bottom:4px;">
+                WALLETS THAT TRADED (${data.wallet_trades.length})
+            </div>
+            <div class="table-responsive" style="margin-bottom:20px;">
+                <table class="table table-sm mb-0">
+                    <thead><tr>
+                        <th>Wallet</th><th>Score</th><th>Buy SOL</th><th>PnL</th><th>Entry Rank</th><th>Status</th>
+                    </tr></thead>
+                    <tbody>
+                        ${data.wallet_trades.map(wt => `
+                        <tr>
+                            <td class="addr">${shortAddr(wt.wallet_address)}</td>
+                            <td><span style="color:${scoreColor(wt.total_score || 0)}">${wt.total_score ? wt.total_score.toFixed(0) : '—'}</span></td>
+                            <td>${fmt(wt.buy_amount_sol, 4)}</td>
+                            <td>${fmtPnl(wt.pnl_sol)}</td>
+                            <td>${wt.entry_rank || '—'}</td>
+                            <td>${wt.is_monitored ? '<span class="badge badge-monitored">MON</span>' : ''}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // Copy trades on this token
+    if (data.copy_trades.length > 0) {
+        html += `
+            <div style="color:var(--text-dim); font-size:10px; letter-spacing:2px; margin-bottom:8px; border-bottom:1px solid var(--border-dim); padding-bottom:4px;">
+                COPY TRADES (${data.copy_trades.length})
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead><tr>
+                        <th>Side</th><th>SOL</th><th>Price</th><th>Wallet</th><th>Status</th><th>Time</th>
+                    </tr></thead>
+                    <tbody>
+                        ${data.copy_trades.map(ct => `
+                        <tr>
+                            <td><span class="badge badge-${ct.side}">${ct.side.toUpperCase()}</span></td>
+                            <td>${fmt(ct.amount_sol, 6)}</td>
+                            <td>${fmtUsd(ct.price_usd)}</td>
+                            <td class="addr">${shortAddr(ct.triggered_by_wallet)}</td>
+                            <td>${ct.status}</td>
+                            <td style="white-space:nowrap">${ct.created_at || '—'}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    showModal('TOKEN :: ' + (t.symbol || shortAddr(t.mint_address)), html);
+}
+
+// =========================================================================
+// Chart Instances
+// =========================================================================
+let pnlChart = null;
+let walletScoreChart = null;
+let winLossChart = null;
+let tradeActivityChart = null;
+let portfolioChart = null;
+
+function destroyChart(chart) {
+    if (chart) chart.destroy();
+    return null;
+}
+
+// =========================================================================
+// Chart: PnL (enhanced terminal theme)
+// =========================================================================
+async function loadPnlChart() {
+    const data = await fetchApi('/api/daily_pnl');
+    const canvas = document.getElementById('pnlChart');
+    if (!canvas || !data) return;
+
+    pnlChart = destroyChart(pnlChart);
+    const days = data.daily_pnl;
+
+    if (days.length === 0) return;
+
+    let cumulative = 0;
+    const cumulativeData = days.map(d => { cumulative += d.total_pnl_sol; return cumulative; });
+
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+    gradient.addColorStop(0, 'rgba(0, 255, 65, 0.2)');
+    gradient.addColorStop(1, 'rgba(0, 255, 65, 0)');
+
+    pnlChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: days.map(d => d.date),
+            datasets: [
+                {
+                    label: 'Daily PnL (SOL)',
+                    data: days.map(d => d.total_pnl_sol),
+                    borderColor: '#00ff41',
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    pointBackgroundColor: '#00ff41',
+                    pointBorderColor: '#00ff41',
+                    pointRadius: 3,
+                    pointHoverRadius: 6,
+                    tension: 0.3,
+                    fill: true,
+                },
+                {
+                    label: 'Cumulative PnL (SOL)',
+                    data: cumulativeData,
+                    borderColor: '#ffb000',
+                    backgroundColor: 'rgba(255,176,0,0.05)',
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    tension: 0.3,
+                    fill: true,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { labels: { color: '#006600', font: { size: 11 } } }
+            },
+            scales: {
+                x: { ticks: { color: '#004400' }, grid: { color: '#001a00' } },
+                y: { ticks: { color: '#004400' }, grid: { color: '#001a00' } }
+            }
+        }
+    });
+}
+
+// =========================================================================
+// Chart: Wallet Score Distribution
+// =========================================================================
+async function loadWalletScoreChart() {
+    const data = await fetchApi('/api/wallet_score_distribution');
+    const canvas = document.getElementById('walletScoreChart');
+    if (!canvas || !data) return;
+
+    walletScoreChart = destroyChart(walletScoreChart);
+    const dist = data.distribution;
+
+    const barColors = ['#ff0040', '#ffb000', '#ffb000', '#00aa2a', '#00ff41'];
+    const borderColors = barColors.map(c => c);
+
+    walletScoreChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: dist.map(d => d.range),
+            datasets: [{
+                label: 'Wallets',
+                data: dist.map(d => d.count),
+                backgroundColor: barColors.map(c => c + '60'),
+                borderColor: borderColors,
+                borderWidth: 1,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'SCORE DISTRIBUTION', color: '#006600', font: { size: 10 } }
+            },
+            scales: {
+                x: { ticks: { color: '#004400' }, grid: { display: false } },
+                y: { ticks: { color: '#004400' }, grid: { color: '#001a00' }, beginAtZero: true }
+            }
+        }
+    });
+}
+
+// =========================================================================
+// Chart: Win/Loss Donut
+// =========================================================================
+function loadWinLossChart(stats) {
+    const canvas = document.getElementById('winLossChart');
+    if (!canvas || !stats) return;
+
+    winLossChart = destroyChart(winLossChart);
+    const wl = stats.win_loss;
+    const total = wl.wins + wl.losses;
+
+    winLossChart = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels: ['Wins', 'Losses'],
+            datasets: [{
+                data: [wl.wins || 0, wl.losses || 0],
+                backgroundColor: ['rgba(0,255,65,0.6)', 'rgba(255,0,64,0.6)'],
+                borderColor: ['#00ff41', '#ff0040'],
+                borderWidth: 1,
+            }]
+        },
+        options: {
+            responsive: true,
+            cutout: '70%',
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'WIN / LOSS', color: '#006600', font: { size: 10 } }
+            }
+        },
+        plugins: [{
+            id: 'centerText',
+            afterDraw(chart) {
+                const { ctx, width, height } = chart;
+                const rate = total > 0 ? ((wl.wins / total) * 100).toFixed(0) : '0';
+                ctx.save();
+                ctx.font = "bold 20px 'Fira Code', monospace";
+                ctx.fillStyle = '#00ff41';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = '#00ff41';
+                ctx.shadowBlur = 10;
+                ctx.fillText(rate + '%', width / 2, height / 2);
+                ctx.restore();
+            }
+        }]
+    });
+}
+
+// =========================================================================
+// Chart: Trade Activity Timeline
+// =========================================================================
+function loadTradeActivityChart(stats) {
+    const canvas = document.getElementById('tradeActivityChart');
+    if (!canvas || !stats) return;
+
+    tradeActivityChart = destroyChart(tradeActivityChart);
+    const days = stats.daily_activity;
+    if (days.length === 0) return;
+
+    tradeActivityChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: days.map(d => d.date),
+            datasets: [
+                {
+                    label: 'Buys',
+                    data: days.map(d => d.buys),
+                    backgroundColor: 'rgba(0,255,65,0.5)',
+                    borderColor: '#00ff41',
+                    borderWidth: 1,
+                },
+                {
+                    label: 'Sells',
+                    data: days.map(d => d.sells),
+                    backgroundColor: 'rgba(255,176,0,0.5)',
+                    borderColor: '#ffb000',
+                    borderWidth: 1,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { labels: { color: '#006600', font: { size: 10 } } },
+                title: { display: true, text: 'TRADE ACTIVITY (30D)', color: '#006600', font: { size: 10 } }
+            },
+            scales: {
+                x: { stacked: true, ticks: { color: '#004400' }, grid: { display: false } },
+                y: { stacked: true, ticks: { color: '#004400' }, grid: { color: '#001a00' }, beginAtZero: true }
+            }
+        }
+    });
+}
+
+// =========================================================================
+// Chart: Portfolio Allocation
+// =========================================================================
+function loadPortfolioChart(stats) {
+    const canvas = document.getElementById('portfolioChart');
+    if (!canvas || !stats) return;
+
+    portfolioChart = destroyChart(portfolioChart);
+    const alloc = stats.portfolio_allocation;
+    if (alloc.length === 0) return;
+
+    const greens = ['#00ff41', '#00cc33', '#00aa2a', '#008822', '#006619', '#004411', '#003300'];
+
+    portfolioChart = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels: alloc.map(a => a.token_symbol),
+            datasets: [{
+                data: alloc.map(a => a.amount_sol),
+                backgroundColor: alloc.map((_, i) => (greens[i % greens.length]) + '80'),
+                borderColor: alloc.map((_, i) => greens[i % greens.length]),
+                borderWidth: 1,
+            }]
+        },
+        options: {
+            responsive: true,
+            cutout: '60%',
+            plugins: {
+                legend: { position: 'right', labels: { color: '#006600', font: { size: 10 }, padding: 8 } },
+                title: { display: true, text: 'PORTFOLIO', color: '#006600', font: { size: 10 } }
+            }
+        }
+    });
 }
 
 // =========================================================================
@@ -154,303 +1178,402 @@ async function loadTab(name) {
     }
 }
 
+// =========================================================================
+// OVERVIEW TAB
+// =========================================================================
 async function loadOverview() {
-    const data = await fetchApi('/api/overview');
+    const [data, tradeStats] = await Promise.all([
+        fetchApi('/api/overview'),
+        fetchApi('/api/trade_stats'),
+    ]);
 
-    // Update header badges
+    if (!data) return;
+
+    // Update header
+    const statusText = document.getElementById('status-text');
+    const statusDot = document.getElementById('status-dot');
     const modeEl = document.getElementById('mode-badge');
-    modeEl.textContent = data.trading_mode.toUpperCase();
-    modeEl.className = 'badge me-2 ' + (data.trading_mode === 'live' ? 'bg-danger' : 'bg-info');
 
-    const statusEl = document.getElementById('status-badge');
-    statusEl.textContent = data.trading_paused ? 'PAUSED' : 'RUNNING';
-    statusEl.className = 'badge ' + (data.trading_paused ? 'bg-warning' : 'bg-success');
+    if (data.trading_paused) {
+        statusText.textContent = 'PAUSED';
+        statusText.style.color = 'var(--accent-amber)';
+        statusDot.classList.add('pulse-dot-amber');
+    } else {
+        statusText.textContent = 'SYSTEM ONLINE';
+        statusText.style.color = 'var(--accent-green)';
+        statusDot.classList.remove('pulse-dot-amber');
+    }
 
+    const mode = data.trading_mode.toUpperCase();
+    if (mode === 'LIVE') {
+        modeEl.textContent = '◉ LIVE TRADING';
+        modeEl.style.color = 'var(--accent-red)';
+    } else if (mode === 'DRY_RUN') {
+        modeEl.textContent = '◎ DRY RUN';
+        modeEl.style.color = 'var(--accent-amber)';
+    } else {
+        modeEl.textContent = '○ ALERT ONLY';
+        modeEl.style.color = 'var(--text-dim)';
+    }
+
+    // Build overview HTML
     const el = document.getElementById('tab-overview');
     el.innerHTML = `
-        <!-- Stat Cards -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-3">
-                <div class="stat-card">
-                    <div class="stat-label">Open Positions</div>
-                    <div class="stat-value">${data.open_positions}</div>
+        <!-- Row 1: Key Stats -->
+        <div class="row g-3 mb-3">
+            <div class="col-md-3 col-6">
+                <div class="terminal-card">
+                    <div class="card-titlebar"><span class="title-text">POSITIONS</span></div>
+                    <div class="card-body-inner text-center">
+                        <div class="stat-value" id="stat-positions">${data.open_positions}</div>
+                        <div class="stat-label">OPEN</div>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="stat-card">
-                    <div class="stat-label">Total Invested</div>
-                    <div class="stat-value">${fmt(data.total_invested, 4)} <small class="text-muted">SOL</small></div>
+            <div class="col-md-3 col-6">
+                <div class="terminal-card">
+                    <div class="card-titlebar"><span class="title-text">INVESTED</span></div>
+                    <div class="card-body-inner text-center">
+                        <div class="stat-value" id="stat-invested">${fmt(data.total_invested, 4)}</div>
+                        <div class="stat-label">SOL DEPLOYED</div>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="stat-card">
-                    <div class="stat-label">Unrealized PnL</div>
-                    <div class="stat-value">${fmtPnl(data.unrealized_pnl)}</div>
+            <div class="col-md-3 col-6">
+                <div class="terminal-card">
+                    <div class="card-titlebar"><span class="title-text">UNREALIZED</span></div>
+                    <div class="card-body-inner text-center">
+                        <div class="stat-value">${fmtPnl(data.unrealized_pnl)}</div>
+                        <div class="stat-label">OPEN PNL</div>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="stat-card">
-                    <div class="stat-label">All-Time PnL</div>
-                    <div class="stat-value">${fmtPnl(data.all_time_pnl)}</div>
+            <div class="col-md-3 col-6">
+                <div class="terminal-card">
+                    <div class="card-titlebar"><span class="title-text">ALL TIME</span></div>
+                    <div class="card-body-inner text-center">
+                        <div class="stat-value">${fmtPnl(data.all_time_pnl)}</div>
+                        <div class="stat-label">REALIZED PNL</div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="row g-3 mb-4">
-            <div class="col-md-3">
-                <div class="stat-card">
-                    <div class="stat-label">Monitored Wallets</div>
-                    <div class="stat-value">${data.monitored_wallets}</div>
+        <!-- Row 2: Secondary Stats -->
+        <div class="row g-3 mb-3">
+            <div class="col-md-3 col-6">
+                <div class="terminal-card">
+                    <div class="card-titlebar"><span class="title-text">WALLETS</span></div>
+                    <div class="card-body-inner text-center">
+                        <div class="stat-value" style="color:var(--text-secondary); text-shadow:none;">${data.monitored_wallets}</div>
+                        <div class="stat-label">MONITORED</div>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="stat-card">
-                    <div class="stat-label">Wallets Scored</div>
-                    <div class="stat-value">${data.total_wallets}</div>
+            <div class="col-md-3 col-6">
+                <div class="terminal-card">
+                    <div class="card-titlebar"><span class="title-text">SCORED</span></div>
+                    <div class="card-body-inner text-center">
+                        <div class="stat-value" style="color:var(--text-secondary); text-shadow:none;">${data.total_wallets}</div>
+                        <div class="stat-label">WALLETS ANALYZED</div>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="stat-card">
-                    <div class="stat-label">Tokens Discovered</div>
-                    <div class="stat-value">${data.total_tokens}</div>
+            <div class="col-md-3 col-6">
+                <div class="terminal-card">
+                    <div class="card-titlebar"><span class="title-text">DISCOVERY</span></div>
+                    <div class="card-body-inner text-center">
+                        <div class="stat-value" style="color:var(--text-secondary); text-shadow:none;">${data.total_tokens}</div>
+                        <div class="stat-label">TOKENS FOUND</div>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="stat-card">
-                    <div class="stat-label">Today's PnL</div>
-                    <div class="stat-value">${fmtPnl(data.today_pnl)}</div>
-                    <div class="text-muted" style="font-size:0.8rem">${data.today_buys} buys, ${data.today_sells} sells</div>
+            <div class="col-md-3 col-6">
+                <div class="terminal-card">
+                    <div class="card-titlebar"><span class="title-text">TODAY</span></div>
+                    <div class="card-body-inner text-center">
+                        <div class="stat-value">${fmtPnl(data.today_pnl)}</div>
+                        <div class="stat-label">${data.today_buys} BUYS / ${data.today_sells} SELLS</div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- PnL Chart -->
-        <div class="stat-card mb-4">
-            <h6 class="text-muted mb-3">Daily PnL</h6>
-            <canvas id="pnlChart"></canvas>
+        <div class="terminal-card mb-3">
+            <div class="card-titlebar"><span class="title-text">PNL_CHART</span></div>
+            <div class="chart-container">
+                <canvas id="pnlChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Charts Row: Score Dist + Win/Loss + Portfolio -->
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <div class="terminal-card chart-small">
+                    <div class="card-titlebar"><span class="title-text">WALLET_SCORES</span></div>
+                    <div class="chart-container">
+                        <canvas id="walletScoreChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="terminal-card chart-small">
+                    <div class="card-titlebar"><span class="title-text">WIN_LOSS</span></div>
+                    <div class="chart-container">
+                        <canvas id="winLossChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="terminal-card chart-small">
+                    <div class="card-titlebar"><span class="title-text">PORTFOLIO</span></div>
+                    <div class="chart-container">
+                        <canvas id="portfolioChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trade Activity Chart -->
+        <div class="terminal-card mb-3">
+            <div class="card-titlebar"><span class="title-text">TRADE_ACTIVITY</span></div>
+            <div class="chart-container">
+                <canvas id="tradeActivityChart"></canvas>
+            </div>
         </div>
 
         <!-- Recent Trades -->
-        <div class="stat-card">
-            <h6 class="text-muted mb-3">Recent Trades</h6>
-            ${data.recent_trades.length > 0 ? `
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead><tr>
-                        <th>Time</th><th>Token</th><th>Side</th><th>Amount</th><th>Status</th>
-                    </tr></thead>
-                    <tbody>
-                        ${data.recent_trades.map(t => `
-                        <tr>
-                            <td>${t.created_at || '—'}</td>
-                            <td>${t.token_symbol || shortAddr(t.token_mint)}</td>
-                            <td><span class="badge badge-${t.side}">${t.side.toUpperCase()}</span></td>
-                            <td>${fmt(t.amount_sol, 6)} SOL</td>
-                            <td>${t.status}</td>
-                        </tr>`).join('')}
-                    </tbody>
-                </table>
-            </div>` : '<div class="text-muted">No trades yet</div>'}
+        <div class="terminal-card">
+            <div class="card-titlebar">
+                <span class="title-text">RECENT_TRADES</span>
+                <span style="font-size:10px;">${data.recent_trades.length} ENTRIES</span>
+            </div>
+            <div class="card-body-inner">
+                ${data.recent_trades.length > 0 ? `
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead><tr>
+                            <th>Time</th><th>Token</th><th>Side</th><th>Amount</th><th>Status</th>
+                        </tr></thead>
+                        <tbody>
+                            ${data.recent_trades.map(t => `
+                            <tr onclick="showTokenDetail('${t.token_mint}')">
+                                <td style="white-space:nowrap">${t.created_at || '—'}</td>
+                                <td>${t.token_symbol || shortAddr(t.token_mint)}</td>
+                                <td><span class="badge badge-${t.side}">${t.side.toUpperCase()}</span></td>
+                                <td>${fmt(t.amount_sol, 6)} SOL</td>
+                                <td>${t.status}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>` : '<div style="color:var(--text-dim); text-align:center; padding:20px;">AWAITING TRADE DATA . . .<span class="blink-cursor"></span></div>'}
+            </div>
         </div>
     `;
 
-    // Load PnL chart
+    // Load all charts
     loadPnlChart();
-}
-
-async function loadPnlChart() {
-    const data = await fetchApi('/api/daily_pnl');
-    const days = data.daily_pnl;
-
-    const canvas = document.getElementById('pnlChart');
-    if (!canvas) return;
-
-    if (pnlChart) pnlChart.destroy();
-
-    if (days.length === 0) {
-        canvas.parentElement.innerHTML += '<div class="text-muted text-center py-3">No daily data yet</div>';
-        return;
+    loadWalletScoreChart();
+    if (tradeStats) {
+        loadWinLossChart(tradeStats);
+        loadTradeActivityChart(tradeStats);
+        loadPortfolioChart(tradeStats);
     }
 
-    let cumulative = 0;
-    const cumulativeData = days.map(d => {
-        cumulative += d.total_pnl_sol;
-        return cumulative;
-    });
-
-    pnlChart = new Chart(canvas, {
-        type: 'line',
-        data: {
-            labels: days.map(d => d.date),
-            datasets: [
-                {
-                    label: 'Daily PnL (SOL)',
-                    data: days.map(d => d.total_pnl_sol),
-                    borderColor: '#1f6feb',
-                    backgroundColor: 'rgba(31,111,235,0.1)',
-                    tension: 0.3,
-                    fill: true,
-                },
-                {
-                    label: 'Cumulative PnL (SOL)',
-                    data: cumulativeData,
-                    borderColor: '#3fb950',
-                    backgroundColor: 'rgba(63,185,80,0.05)',
-                    tension: 0.3,
-                    fill: true,
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { labels: { color: '#8b949e' } } },
-            scales: {
-                x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
-                y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } }
-            }
-        }
-    });
+    // Update ticker
+    updateTicker(data.recent_trades);
+    updateRefreshTimer();
 }
 
+// =========================================================================
+// WALLETS TAB
+// =========================================================================
 async function loadWallets() {
     const data = await fetchApi('/api/wallets');
     const el = document.getElementById('tab-wallets');
+    if (!data) return;
 
     if (data.wallets.length === 0) {
         el.innerHTML = `<div class="empty-state">
-            <h5>No wallets scored yet</h5>
-            <p>Run discovery + analysis first:</p>
-            <code>python main.py --discover</code><br>
+            <h5>NO WALLETS SCORED<span class="blink-cursor"></span></h5>
+            <p style="margin-top:12px;">Run discovery + analysis first:</p>
+            <code>python main.py --discover</code><br><br>
             <code>python main.py --analyze</code>
         </div>`;
         return;
     }
 
     el.innerHTML = `
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="text-muted mb-0">Smart Wallet Leaderboard (${data.wallets.length})</h6>
+        <div class="terminal-card">
+            <div class="card-titlebar">
+                <span class="title-text">SMART_WALLET_LEADERBOARD</span>
+                <span style="font-size:10px;">${data.wallets.length} WALLETS</span>
             </div>
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead><tr>
-                        <th>#</th><th>Address</th><th>Score</th><th>PnL</th>
-                        <th>Win Rate</th><th>Trades</th><th>Timing</th><th>Status</th>
-                    </tr></thead>
-                    <tbody>
-                        ${data.wallets.map((w, i) => `
-                        <tr>
-                            <td>${i + 1}</td>
-                            <td class="addr">${shortAddr(w.address)}</td>
-                            <td>
-                                <strong style="color:${scoreColor(w.total_score)}">${w.total_score.toFixed(0)}</strong>
-                                <div class="score-bar mt-1"><div class="score-fill" style="width:${w.total_score}%; background:${scoreColor(w.total_score)}"></div></div>
-                            </td>
-                            <td>${fmtPnl(w.total_pnl_sol)}</td>
-                            <td>${w.win_rate.toFixed(0)}%</td>
-                            <td>${w.total_trades}</td>
-                            <td>Rank ${w.avg_entry_rank || '—'}</td>
-                            <td>
-                                ${w.is_monitored ? '<span class="badge badge-monitored">Monitored</span>' : ''}
-                                ${w.is_flagged ? '<span class="badge badge-flagged">' + (w.flag_reason || 'Flagged') + '</span>' : ''}
-                            </td>
-                        </tr>`).join('')}
-                    </tbody>
-                </table>
+            <div class="card-body-inner">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead><tr>
+                            <th>#</th><th>Address</th><th>Score</th><th>PnL</th>
+                            <th>Win Rate</th><th>Trades</th><th>Timing</th><th>Status</th>
+                        </tr></thead>
+                        <tbody>
+                            ${data.wallets.map((w, i) => `
+                            <tr onclick="showWalletDetail('${w.address}')">
+                                <td style="color:var(--text-dim)">${i + 1}</td>
+                                <td class="addr">
+                                    ${w.is_monitored ? '<span class="pulse-dot"></span>' : ''}${shortAddr(w.address)}
+                                </td>
+                                <td>
+                                    <strong style="color:${scoreColor(w.total_score)}; text-shadow:0 0 6px ${scoreColor(w.total_score)}40;">${w.total_score.toFixed(0)}</strong>
+                                    <div class="score-bar mt-1"><div class="score-fill" style="width:${w.total_score}%; background:${scoreColor(w.total_score)}; color:${scoreColor(w.total_score)};"></div></div>
+                                </td>
+                                <td>${fmtPnl(w.total_pnl_sol)}</td>
+                                <td>${w.win_rate.toFixed(0)}%</td>
+                                <td>${w.total_trades}</td>
+                                <td style="color:var(--text-dim)">Rank ${w.avg_entry_rank || '—'}</td>
+                                <td>
+                                    ${w.is_monitored ? '<span class="badge badge-monitored">MON</span>' : ''}
+                                    ${w.is_flagged ? '<span class="badge badge-flagged">' + (w.flag_reason || 'FLAG') + '</span>' : ''}
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
+    updateRefreshTimer();
 }
 
+// =========================================================================
+// TOKENS TAB
+// =========================================================================
 async function loadTokens() {
     const data = await fetchApi('/api/tokens');
     const el = document.getElementById('tab-tokens');
+    if (!data) return;
 
     if (data.tokens.length === 0) {
         el.innerHTML = `<div class="empty-state">
-            <h5>No tokens discovered yet</h5>
-            <p>Run discovery:</p>
+            <h5>NO TOKENS DISCOVERED<span class="blink-cursor"></span></h5>
+            <p style="margin-top:12px;">Run discovery:</p>
             <code>python main.py --discover</code>
         </div>`;
         return;
     }
 
     el.innerHTML = `
-        <div class="stat-card">
-            <h6 class="text-muted mb-3">Discovered Tokens (${data.tokens.length})</h6>
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead><tr>
-                        <th>#</th><th>Symbol</th><th>Multiplier</th><th>Market Cap</th>
-                        <th>Liquidity</th><th>Volume 24h</th><th>Holders</th><th>Source</th>
-                    </tr></thead>
-                    <tbody>
-                        ${data.tokens.map((t, i) => `
-                        <tr>
-                            <td>${i + 1}</td>
-                            <td><strong>${t.symbol || '—'}</strong><br><span class="text-muted" style="font-size:0.75rem">${t.name || ''}</span></td>
-                            <td><strong class="pnl-positive">${t.price_multiplier ? t.price_multiplier.toFixed(1) + 'x' : '—'}</strong></td>
-                            <td>${fmtUsd(t.market_cap_usd)}</td>
-                            <td>${fmtUsd(t.liquidity_usd)}</td>
-                            <td>${fmtUsd(t.volume_24h_usd)}</td>
-                            <td>${t.holder_count || '—'}</td>
-                            <td>${t.data_source || '—'}</td>
-                        </tr>`).join('')}
-                    </tbody>
-                </table>
+        <div class="terminal-card">
+            <div class="card-titlebar">
+                <span class="title-text">DISCOVERED_TOKENS</span>
+                <span style="font-size:10px;">${data.tokens.length} TOKENS</span>
+            </div>
+            <div class="card-body-inner">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead><tr>
+                            <th>#</th><th>Symbol</th><th>Multiplier</th><th>Market Cap</th>
+                            <th>Liquidity</th><th>Vol 24h</th><th>Holders</th><th>Source</th>
+                        </tr></thead>
+                        <tbody>
+                            ${data.tokens.map((t, i) => `
+                            <tr onclick="showTokenDetail('${t.mint_address}')">
+                                <td style="color:var(--text-dim)">${i + 1}</td>
+                                <td>
+                                    <strong style="color:var(--accent-green)">${t.symbol || '—'}</strong>
+                                    <br><span style="color:var(--text-dim); font-size:10px;">${t.name || ''}</span>
+                                </td>
+                                <td>
+                                    <strong style="color:var(--accent-green); text-shadow:var(--glow-green);">
+                                        ${t.price_multiplier ? t.price_multiplier.toFixed(1) + 'x' : '—'}
+                                    </strong>
+                                </td>
+                                <td>${fmtUsd(t.market_cap_usd)}</td>
+                                <td>${fmtUsd(t.liquidity_usd)}</td>
+                                <td>${fmtUsd(t.volume_24h_usd)}</td>
+                                <td>${t.holder_count || '—'}</td>
+                                <td style="color:var(--accent-amber)">${t.data_source || '—'}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
+    updateRefreshTimer();
 }
 
+// =========================================================================
+// TRADES TAB
+// =========================================================================
 async function loadTrades() {
     const data = await fetchApi('/api/trades');
     const el = document.getElementById('tab-trades');
+    if (!data) return;
 
     if (data.trades.length === 0) {
         el.innerHTML = `<div class="empty-state">
-            <h5>No trades yet</h5>
-            <p>Trades will appear here once the bot starts copying wallets.</p>
+            <h5>NO TRADES EXECUTED<span class="blink-cursor"></span></h5>
+            <p style="margin-top:12px;">Trades will appear once the bot starts copying wallets.</p>
         </div>`;
         return;
     }
 
     el.innerHTML = `
-        <div class="stat-card">
-            <h6 class="text-muted mb-3">Trade History (${data.trades.length})</h6>
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead><tr>
-                        <th>Time</th><th>Token</th><th>Side</th><th>SOL</th>
-                        <th>Price</th><th>Copied From</th><th>Reason</th><th>Status</th>
-                    </tr></thead>
-                    <tbody>
-                        ${data.trades.map(t => `
-                        <tr>
-                            <td style="white-space:nowrap">${t.created_at || '—'}</td>
-                            <td><strong>${t.token_symbol || shortAddr(t.token_mint)}</strong></td>
-                            <td><span class="badge badge-${t.side}">${t.side.toUpperCase()}</span></td>
-                            <td>${fmt(t.amount_sol, 6)}</td>
-                            <td>${fmtUsd(t.price_usd)}</td>
-                            <td class="addr">${shortAddr(t.triggered_by_wallet)}</td>
-                            <td>${t.sell_reason || '—'}</td>
-                            <td>${t.status}</td>
-                        </tr>`).join('')}
-                    </tbody>
-                </table>
+        <div class="terminal-card">
+            <div class="card-titlebar">
+                <span class="title-text">TRADE_HISTORY</span>
+                <span style="font-size:10px;">${data.trades.length} RECORDS</span>
+            </div>
+            <div class="card-body-inner">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead><tr>
+                            <th>Time</th><th>Token</th><th>Side</th><th>SOL</th>
+                            <th>Price</th><th>Copied From</th><th>Reason</th><th>Status</th>
+                        </tr></thead>
+                        <tbody>
+                            ${data.trades.map(t => `
+                            <tr>
+                                <td style="white-space:nowrap; color:var(--text-dim)">${t.created_at || '—'}</td>
+                                <td>
+                                    <span style="cursor:pointer; color:var(--accent-green);" onclick="showTokenDetail('${t.token_mint}')">
+                                        ${t.token_symbol || shortAddr(t.token_mint)}
+                                    </span>
+                                </td>
+                                <td><span class="badge badge-${t.side}">${t.side.toUpperCase()}</span></td>
+                                <td>${fmt(t.amount_sol, 6)}</td>
+                                <td>${fmtUsd(t.price_usd)}</td>
+                                <td>
+                                    <span class="addr" style="cursor:pointer;" onclick="showWalletDetail('${t.triggered_by_wallet}')">
+                                        ${shortAddr(t.triggered_by_wallet)}
+                                    </span>
+                                </td>
+                                <td style="color:var(--text-dim)">${t.sell_reason || '—'}</td>
+                                <td>${t.status}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
+    updateRefreshTimer();
 }
 
+// =========================================================================
+// POSITIONS TAB
+// =========================================================================
 async function loadPositions() {
     const data = await fetchApi('/api/positions');
     const el = document.getElementById('tab-positions');
+    if (!data) return;
 
     if (data.positions.length === 0) {
         el.innerHTML = `<div class="empty-state">
-            <h5>No positions yet</h5>
-            <p>Positions will appear here once the bot executes trades.</p>
+            <h5>NO POSITIONS<span class="blink-cursor"></span></h5>
+            <p style="margin-top:12px;">Positions will appear once the bot executes trades.</p>
         </div>`;
         return;
     }
@@ -459,63 +1582,86 @@ async function loadPositions() {
     const closed = data.positions.filter(p => p.status === 'closed');
 
     el.innerHTML = `
-        <div class="stat-card mb-4">
-            <h6 class="text-muted mb-3">Open Positions (${open.length})</h6>
-            ${open.length > 0 ? `
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead><tr>
-                        <th>Token</th><th>Invested</th><th>Entry</th><th>Current</th>
-                        <th>Multiple</th><th>Unrealized PnL</th><th>Copied From</th>
-                    </tr></thead>
-                    <tbody>
-                        ${open.map(p => `
-                        <tr>
-                            <td><strong>${p.token_symbol || shortAddr(p.token_mint)}</strong></td>
-                            <td>${fmt(p.amount_sol_invested, 4)} SOL</td>
-                            <td>${fmtUsd(p.entry_price_usd)}</td>
-                            <td>${fmtUsd(p.current_price_usd)}</td>
-                            <td>${p.multiplier ? '<strong>' + p.multiplier.toFixed(2) + 'x</strong>' : '—'}</td>
-                            <td>${fmtPnl(p.unrealized_pnl_sol)}</td>
-                            <td class="addr">${shortAddr(p.triggered_by_wallet)}</td>
-                        </tr>`).join('')}
-                    </tbody>
-                </table>
-            </div>` : '<div class="text-muted">No open positions</div>'}
+        <div class="terminal-card mb-3">
+            <div class="card-titlebar">
+                <span class="title-text">OPEN_POSITIONS</span>
+                <span style="font-size:10px;">${open.length} ACTIVE</span>
+            </div>
+            <div class="card-body-inner">
+                ${open.length > 0 ? `
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead><tr>
+                            <th>Token</th><th>Invested</th><th>Entry</th><th>Current</th>
+                            <th>Multiple</th><th>Unrealized PnL</th><th>Copied From</th>
+                        </tr></thead>
+                        <tbody>
+                            ${open.map(p => `
+                            <tr>
+                                <td>
+                                    <span style="cursor:pointer; color:var(--accent-green);" onclick="showTokenDetail('${p.token_mint}')">
+                                        <strong>${p.token_symbol || shortAddr(p.token_mint)}</strong>
+                                    </span>
+                                </td>
+                                <td>${fmt(p.amount_sol_invested, 4)} SOL</td>
+                                <td>${fmtUsd(p.entry_price_usd)}</td>
+                                <td>${fmtUsd(p.current_price_usd)}</td>
+                                <td>
+                                    ${p.multiplier ? `<strong style="color:${p.multiplier >= 1 ? 'var(--accent-green)' : 'var(--accent-red)'}; text-shadow:${p.multiplier >= 1 ? 'var(--glow-green)' : 'var(--glow-red)'};">${p.multiplier.toFixed(2)}x</strong>` : '—'}
+                                </td>
+                                <td>${fmtPnl(p.unrealized_pnl_sol)}</td>
+                                <td>
+                                    <span class="addr" style="cursor:pointer;" onclick="showWalletDetail('${p.triggered_by_wallet}')">
+                                        ${shortAddr(p.triggered_by_wallet)}
+                                    </span>
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>` : '<div style="color:var(--text-dim); text-align:center; padding:20px;">NO OPEN POSITIONS</div>'}
+            </div>
         </div>
 
-        <div class="stat-card">
-            <h6 class="text-muted mb-3">Closed Positions (${closed.length})</h6>
-            ${closed.length > 0 ? `
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead><tr>
-                        <th>Token</th><th>Invested</th><th>Realized PnL</th>
-                        <th>Close Reason</th><th>Opened</th><th>Closed</th>
-                    </tr></thead>
-                    <tbody>
-                        ${closed.map(p => `
-                        <tr>
-                            <td><strong>${p.token_symbol || shortAddr(p.token_mint)}</strong></td>
-                            <td>${fmt(p.amount_sol_invested, 4)} SOL</td>
-                            <td>${fmtPnl(p.realized_pnl_sol)}</td>
-                            <td>${p.close_reason || '—'}</td>
-                            <td>${p.opened_at || '—'}</td>
-                            <td>${p.closed_at || '—'}</td>
-                        </tr>`).join('')}
-                    </tbody>
-                </table>
-            </div>` : '<div class="text-muted">No closed positions</div>'}
+        <div class="terminal-card">
+            <div class="card-titlebar">
+                <span class="title-text">CLOSED_POSITIONS</span>
+                <span style="font-size:10px;">${closed.length} RECORDS</span>
+            </div>
+            <div class="card-body-inner">
+                ${closed.length > 0 ? `
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead><tr>
+                            <th>Token</th><th>Invested</th><th>Realized PnL</th>
+                            <th>Reason</th><th>Opened</th><th>Closed</th>
+                        </tr></thead>
+                        <tbody>
+                            ${closed.map(p => `
+                            <tr>
+                                <td>
+                                    <span style="cursor:pointer; color:var(--text-secondary);" onclick="showTokenDetail('${p.token_mint}')">
+                                        <strong>${p.token_symbol || shortAddr(p.token_mint)}</strong>
+                                    </span>
+                                </td>
+                                <td>${fmt(p.amount_sol_invested, 4)} SOL</td>
+                                <td>${fmtPnl(p.realized_pnl_sol)}</td>
+                                <td style="color:var(--text-dim)">${p.close_reason || '—'}</td>
+                                <td style="color:var(--text-dim); white-space:nowrap;">${p.opened_at || '—'}</td>
+                                <td style="color:var(--text-dim); white-space:nowrap;">${p.closed_at || '—'}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>` : '<div style="color:var(--text-dim); text-align:center; padding:20px;">NO CLOSED POSITIONS</div>'}
+            </div>
         </div>
     `;
+    updateRefreshTimer();
 }
 
 // =========================================================================
-// Initial Load
+// Initial Load & Auto-Refresh
 // =========================================================================
 loadOverview();
-
-// Auto-refresh every 30 seconds
 setInterval(() => loadTab(activeTab), 30000);
 </script>
 </body>

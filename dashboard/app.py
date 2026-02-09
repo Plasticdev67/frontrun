@@ -20,7 +20,7 @@ import json
 from pathlib import Path
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -241,6 +241,182 @@ async def api_daily_pnl():
         )
         rows = await cursor.fetchall()
         return {"daily_pnl": [dict(r) for r in rows]}
+    finally:
+        await db.close()
+
+
+@app.get("/api/wallet/{address}")
+async def api_wallet_detail(address: str):
+    """Detailed info for a single wallet: scores, token trades, copy trades."""
+    db = await get_db()
+    try:
+        # Wallet record
+        cursor = await db.execute(
+            """SELECT address, total_score, pnl_score, win_rate_score, timing_score,
+                      consistency_score, total_pnl_sol, total_trades, winning_trades,
+                      avg_entry_rank, unique_winners, is_flagged, flag_reason,
+                      is_monitored, first_seen, last_active, score_updated_at
+               FROM wallets WHERE address = ?""",
+            (address,),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Wallet not found")
+        wallet = dict(row)
+        total = wallet.get("total_trades") or 0
+        wallet["win_rate"] = (wallet.get("winning_trades") or 0) / total * 100 if total > 0 else 0
+
+        # Token trades by this wallet
+        cursor = await db.execute(
+            """SELECT token_mint, token_symbol, buy_amount_sol, sell_amount_sol,
+                      pnl_sol, buy_price, sell_price, entry_rank, first_buy_at, last_sell_at
+               FROM wallet_token_trades WHERE wallet_address = ?
+               ORDER BY first_buy_at DESC LIMIT 100""",
+            (address,),
+        )
+        token_trades = [dict(r) for r in await cursor.fetchall()]
+
+        # Copy trades triggered by this wallet
+        cursor = await db.execute(
+            """SELECT id, token_mint, token_symbol, side, amount_sol, price_usd,
+                      status, created_at
+               FROM trades WHERE triggered_by_wallet = ?
+               ORDER BY created_at DESC LIMIT 50""",
+            (address,),
+        )
+        copy_trades = [dict(r) for r in await cursor.fetchall()]
+
+        return {"wallet": wallet, "token_trades": token_trades, "copy_trades": copy_trades}
+    finally:
+        await db.close()
+
+
+@app.get("/api/token/{mint}")
+async def api_token_detail(mint: str):
+    """Detailed info for a single token: metadata, wallets that traded it, copy trades."""
+    db = await get_db()
+    try:
+        # Token record
+        cursor = await db.execute("SELECT * FROM tokens WHERE mint_address = ?", (mint,))
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Token not found")
+        token = dict(row)
+
+        # Wallets that traded this token
+        cursor = await db.execute(
+            """SELECT wtt.wallet_address, wtt.buy_amount_sol, wtt.sell_amount_sol,
+                      wtt.pnl_sol, wtt.entry_rank, wtt.first_buy_at,
+                      w.total_score, w.is_monitored
+               FROM wallet_token_trades wtt
+               LEFT JOIN wallets w ON w.address = wtt.wallet_address
+               WHERE wtt.token_mint = ?
+               ORDER BY wtt.entry_rank ASC LIMIT 50""",
+            (mint,),
+        )
+        wallet_trades = [dict(r) for r in await cursor.fetchall()]
+
+        # Copy trades on this token
+        cursor = await db.execute(
+            """SELECT id, side, amount_sol, price_usd, status, triggered_by_wallet, created_at
+               FROM trades WHERE token_mint = ?
+               ORDER BY created_at DESC LIMIT 50""",
+            (mint,),
+        )
+        copy_trades = [dict(r) for r in await cursor.fetchall()]
+
+        return {"token": token, "wallet_trades": wallet_trades, "copy_trades": copy_trades}
+    finally:
+        await db.close()
+
+
+@app.get("/api/wallet_score_distribution")
+async def api_wallet_score_distribution():
+    """Histogram of wallet scores in 5 buckets."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """SELECT
+                   CASE
+                       WHEN total_score >= 0 AND total_score < 20 THEN '0-20'
+                       WHEN total_score >= 20 AND total_score < 40 THEN '20-40'
+                       WHEN total_score >= 40 AND total_score < 60 THEN '40-60'
+                       WHEN total_score >= 60 AND total_score < 80 THEN '60-80'
+                       WHEN total_score >= 80 THEN '80-100'
+                   END AS score_range,
+                   COUNT(*) as count
+               FROM wallets WHERE total_score > 0
+               GROUP BY score_range ORDER BY score_range"""
+        )
+        rows = await cursor.fetchall()
+        result = {r["score_range"]: r["count"] for r in rows if r["score_range"]}
+
+        # Ensure all 5 buckets exist
+        all_ranges = ["0-20", "20-40", "40-60", "60-80", "80-100"]
+        distribution = [{"range": r, "count": result.get(r, 0)} for r in all_ranges]
+
+        return {"distribution": distribution}
+    finally:
+        await db.close()
+
+
+@app.get("/api/trade_stats")
+async def api_trade_stats():
+    """Win/loss counts, daily trade activity, portfolio allocation."""
+    db = await get_db()
+    try:
+        # Win/loss from closed positions
+        cursor = await db.execute(
+            """SELECT
+                   COUNT(*) as total_closed,
+                   COALESCE(SUM(CASE WHEN realized_pnl_sol > 0 THEN 1 ELSE 0 END), 0) as wins,
+                   COALESCE(SUM(CASE WHEN realized_pnl_sol <= 0 THEN 1 ELSE 0 END), 0) as losses,
+                   COALESCE(SUM(CASE WHEN realized_pnl_sol > 0 THEN realized_pnl_sol ELSE 0 END), 0) as total_win_sol,
+                   COALESCE(SUM(CASE WHEN realized_pnl_sol <= 0 THEN realized_pnl_sol ELSE 0 END), 0) as total_loss_sol
+               FROM positions WHERE status = 'closed'"""
+        )
+        row = await cursor.fetchone()
+        win_loss = {
+            "wins": row["wins"] if row else 0,
+            "losses": row["losses"] if row else 0,
+            "total_win_sol": float(row["total_win_sol"]) if row else 0,
+            "total_loss_sol": float(row["total_loss_sol"]) if row else 0,
+        }
+
+        # Daily trade activity (last 30 days)
+        cursor = await db.execute(
+            """SELECT date(created_at) as trade_date, COUNT(*) as trade_count,
+                      SUM(CASE WHEN side='buy' THEN 1 ELSE 0 END) as buys,
+                      SUM(CASE WHEN side='sell' THEN 1 ELSE 0 END) as sells
+               FROM trades
+               WHERE created_at >= date('now', '-30 days')
+                 AND status IN ('confirmed', 'dry_run')
+               GROUP BY trade_date ORDER BY trade_date ASC"""
+        )
+        rows = await cursor.fetchall()
+        daily_activity = [
+            {"date": r["trade_date"], "buys": r["buys"], "sells": r["sells"]}
+            for r in rows
+        ]
+
+        # Portfolio allocation (open positions)
+        cursor = await db.execute(
+            """SELECT token_symbol, token_mint, amount_sol_invested
+               FROM positions WHERE status = 'open'
+               ORDER BY amount_sol_invested DESC"""
+        )
+        rows = await cursor.fetchall()
+        portfolio = [
+            {"token_symbol": r["token_symbol"], "token_mint": r["token_mint"],
+             "amount_sol": float(r["amount_sol_invested"])}
+            for r in rows
+        ]
+
+        return {
+            "win_loss": win_loss,
+            "daily_activity": daily_activity,
+            "portfolio_allocation": portfolio,
+        }
     finally:
         await db.close()
 
