@@ -743,9 +743,11 @@ async def main() -> None:
                         # Push Telegram alert for executed trade
                         await notifier.notify_buy({
                             "token_symbol": enriched.get("token_symbol"),
-                            "amount_sol": result.get("amount_sol"),
-                            "price_usd": result.get("price_usd"),
+                            "token_mint": enriched.get("token_mint", ""),
+                            "amount_sol": enriched.get("position_size_sol") or result.get("amount_sol"),
+                            "price_usd": (enriched.get("token_data") or {}).get("price_usd") or result.get("price_usd"),
                             "triggered_by_wallet": enriched.get("wallet_address", ""),
+                            "wallet_type": enriched.get("signal_source_type", "human"),
                             "status": result.get("status"),
                             "tx_signature": result.get("tx_signature", ""),
                         })

@@ -78,7 +78,8 @@ class Settings:
     dexscreener_base_url: str = "https://api.dexscreener.com"
 
     # Jupiter — DEX aggregator for trade execution
-    jupiter_base_url: str = "https://quote-api.jup.ag/v6"
+    # V6 (quote-api.jup.ag) is dead. Migrated to lite-api.jup.ag (free tier).
+    jupiter_base_url: str = "https://lite-api.jup.ag/swap/v1"
 
     # Telegram
     telegram_bot_token: str = field(default_factory=lambda: _get_env("TELEGRAM_BOT_TOKEN"))
@@ -295,8 +296,10 @@ class Settings:
     )
 
     # Trades/day threshold above which a wallet is flagged as bot-speed
+    # Set high (200) because real crypto degens easily do 50-150 trades/day
+    # GMGN tags are the primary bot signal; this is a secondary fallback
     bot_speed_threshold: int = field(
-        default_factory=lambda: _get_env_int("BOT_SPEED_THRESHOLD", 50)
+        default_factory=lambda: _get_env_int("BOT_SPEED_THRESHOLD", 200)
     )
 
     # Position multiplier for bot-speed wallet signals (smaller = more cautious)

@@ -187,7 +187,7 @@ class TradeExecutor:
 
         status = "confirmed" if confirmed else "unconfirmed"
         tokens_received = int(quote.get("outAmount", 0))
-        price_usd = signal.get("token_data", {}).get("price_usd", 0)
+        price_usd = (signal.get("token_data") or {}).get("price_usd", 0)
 
         # Record the trade in our audit trail
         trade_id = await self.db.insert_trade({
@@ -256,8 +256,8 @@ class TradeExecutor:
         """
         token_mint = signal["token_mint"]
         token_symbol = signal.get("token_symbol", token_mint[:8])
-        position_size = self.settings.default_position_size_sol
-        price_usd = signal.get("token_data", {}).get("price_usd", 0)
+        position_size = signal.get("position_size_sol") or self.settings.default_position_size_sol
+        price_usd = (signal.get("token_data") or {}).get("price_usd", 0)
 
         logger.info(
             "DRY_RUN_BUY",

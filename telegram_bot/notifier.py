@@ -70,26 +70,43 @@ class TelegramNotifier:
 
     async def notify_buy(self, trade_data: dict) -> None:
         """Alert when the bot copies a trade (buys a token)."""
-        symbol = trade_data.get("token_symbol", "???")
-        amount_sol = trade_data.get("amount_sol", 0)
-        price = trade_data.get("price_usd", 0)
-        wallet = trade_data.get("triggered_by_wallet", "")
+        symbol = trade_data.get("token_symbol") or "???"
+        amount_sol = trade_data.get("amount_sol") or 0
+        price = trade_data.get("price_usd") or 0
+        wallet = trade_data.get("triggered_by_wallet") or ""
         short_wallet = wallet[:6] + "..." + wallet[-4:] if len(wallet) > 10 else wallet
-        status = trade_data.get("status", "unknown")
-        tx = trade_data.get("tx_signature", "")
+        status = trade_data.get("status") or "unknown"
+        tx = trade_data.get("tx_signature") or ""
+        token_mint = trade_data.get("token_mint") or ""
+        wallet_type = trade_data.get("wallet_type") or "human"
+
+        # Wallet type label
+        type_label = {"bot": "BOT", "consensus": "CONSENSUS", "human": "HUMAN"}.get(wallet_type, "HUMAN")
 
         msg = (
-            f"BUY EXECUTED\n"
+            f"BUY EXECUTED ({type_label})\n"
             f"{'='*20}\n\n"
             f"Token: {symbol}\n"
             f"Amount: {amount_sol:.6f} SOL\n"
-            f"Price: ${price:.8f}\n"
+        )
+
+        if price and price > 0:
+            msg += f"Price: ${price:.8f}\n"
+
+        msg += (
             f"Copied from: {short_wallet}\n"
             f"Status: {status}\n"
         )
 
         if tx:
             msg += f"\nTx: {tx[:20]}..."
+
+        # Links to explorers
+        if token_mint:
+            msg += f"\n\nDexScreener: https://dexscreener.com/solana/{token_mint}"
+            msg += f"\nSolscan: https://solscan.io/token/{token_mint}"
+            if "pump" in token_mint.lower():
+                msg += f"\nPump.fun: https://pump.fun/{token_mint}"
 
         await self._send(msg)
 

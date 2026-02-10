@@ -266,6 +266,12 @@ class Database:
         await self.connection.execute(sql, (monitored, address))
         await self.connection.commit()
 
+    async def update_wallet_score(self, address: str, score: float) -> None:
+        """Update a wallet's composite score (0-100)."""
+        sql = "UPDATE wallets SET total_score = ? WHERE address = ?"
+        await self.connection.execute(sql, (score, address))
+        await self.connection.commit()
+
     # =========================================================================
     # Wallet-Token Trade Links (Stage 2: Analyzer)
     # =========================================================================

@@ -251,16 +251,19 @@ class PositionManager:
         except Exception:
             pass
 
-        # Fallback: Jupiter price API
+        # Fallback: DexScreener (free, no API key needed)
         try:
-            url = f"https://price.jup.ag/v6/price?ids={token_mint}"
+            url = f"https://api.dexscreener.com/latest/dex/tokens/{token_mint}"
             async with self.session.get(url) as response:
                 if response.status == 200:
                     data = await response.json()
-                    price_data = data.get("data", {}).get(token_mint, {})
-                    price = price_data.get("price")
-                    if price and price > 0:
-                        return float(price)
+                    pairs = data.get("pairs") or []
+                    if pairs:
+                        # Use the highest-liquidity pair's price
+                        best = max(pairs, key=lambda p: float(p.get("liquidity", {}).get("usd", 0) or 0))
+                        price = best.get("priceUsd")
+                        if price and float(price) > 0:
+                            return float(price)
         except Exception:
             pass
 

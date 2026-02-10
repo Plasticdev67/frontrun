@@ -107,7 +107,10 @@ class SignalGenerator:
                 return False, signal, f"Max position size reached for this token ({invested:.4f} SOL)"
 
         # Check 6: Get token data (price, liquidity, market cap)
+        # Try Birdeye first, fall back to DexScreener
         token_data = await self._get_token_data(token_mint)
+        if not token_data:
+            token_data = await self._get_token_data_dexscreener(token_mint)
         signal["token_data"] = token_data
 
         if token_data:
@@ -214,20 +217,67 @@ class SignalGenerator:
             logger.error("token_data_error", error=str(e))
             return None
 
+    async def _get_token_data_dexscreener(self, token_mint: str) -> dict | None:
+        """
+        Fallback: Fetch token data from DexScreener (free, no API key).
+        Used when Birdeye fails (new tokens, rate limits, etc.)
+        """
+        try:
+            url = f"https://api.dexscreener.com/latest/dex/tokens/{token_mint}"
+            async with self.session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    pairs = data.get("pairs") or []
+                    if pairs:
+                        # Use highest-liquidity pair
+                        best = max(pairs, key=lambda p: float((p.get("liquidity") or {}).get("usd", 0) or 0))
+                        return {
+                            "symbol": best.get("baseToken", {}).get("symbol", "???"),
+                            "name": best.get("baseToken", {}).get("name", ""),
+                            "price_usd": float(best.get("priceUsd") or 0),
+                            "market_cap_usd": float(best.get("marketCap") or 0),
+                            "liquidity_usd": float((best.get("liquidity") or {}).get("usd", 0) or 0),
+                            "volume_24h_usd": float((best.get("volume") or {}).get("h24", 0) or 0),
+                            "holder_count": 0,  # DexScreener doesn't provide this
+                        }
+        except Exception as e:
+            logger.debug("dexscreener_fallback_error", error=str(e))
+        return None
+
+    # GMGN tags that indicate automated/bot wallets
+    BOT_TAGS = {"sandwich_bot", "sniper_bot", "mev_bot", "copy_bot", "arb_bot"}
+
     async def _get_wallet_type(self, wallet_address: str) -> str:
         """
-        Determine if a wallet is human or bot based on its is_bot_speed flag.
+        Determine if a wallet is human or bot.
+
+        Detection priority:
+        1. is_bot_speed flag in DB (already computed by wallet refresher)
+        2. GMGN tags — sandwich_bot, sniper_bot, mev_bot etc. are real bots
+        3. Trade frequency — 200+/day is clearly automated (real degens do 50-150)
+
         Returns 'human' or 'bot'.
         """
         try:
-            sql = "SELECT is_bot_speed, gmgn_buy_30d, gmgn_sell_30d FROM wallets WHERE address = ?"
+            sql = "SELECT is_bot_speed, gmgn_buy_30d, gmgn_sell_30d, gmgn_tags FROM wallets WHERE address = ?"
             cursor = await self.db.connection.execute(sql, (wallet_address,))
             row = await cursor.fetchone()
             if row:
-                # Check the stored flag first
+                # Check 1: Pre-computed flag (set by wallet refresher)
                 if row["is_bot_speed"]:
                     return "bot"
-                # Fallback: calculate from trade frequency
+
+                # Check 2: GMGN tags
+                import json
+                tags_raw = row["gmgn_tags"] or "[]"
+                try:
+                    tags = json.loads(tags_raw) if isinstance(tags_raw, str) else (tags_raw or [])
+                except (json.JSONDecodeError, TypeError):
+                    tags = []
+                if set(tags) & self.BOT_TAGS:
+                    return "bot"
+
+                # Check 3: Trade frequency (200+/day = clearly automated)
                 buy_30d = row["gmgn_buy_30d"] or 0
                 sell_30d = row["gmgn_sell_30d"] or 0
                 trades_per_day = (buy_30d + sell_30d) / 30
@@ -273,7 +323,11 @@ class SignalGenerator:
         Strategy: Simulate a small sell via Jupiter quote API.
         If Jupiter can't find a route to sell, the token is likely a honeypot.
 
-        Returns True if it's a honeypot (BAD), False if it's safe.
+        IMPORTANT: If the API is unreachable (DNS fail, timeout, etc.),
+        we return False (allow the trade) rather than blocking everything.
+        Network issues != honeypot. Real safety comes from position sizing.
+
+        Returns True if it's a CONFIRMED honeypot, False otherwise.
         """
         try:
             # SOL mint address
@@ -288,7 +342,7 @@ class SignalGenerator:
                 "slippageBps": "1000",  # High slippage tolerance for test
             }
 
-            async with self.session.get(url, params=params) as response:
+            async with self.session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as response:
                 if response.status == 200:
                     data = await response.json()
                     # If we got a valid quote, the token can be sold
@@ -297,12 +351,20 @@ class SignalGenerator:
                     else:
                         logger.warning("honeypot_no_output", token=token_mint[:8])
                         return True  # No output amount = can't sell
-                else:
-                    # Jupiter couldn't find a route — likely honeypot or very illiquid
-                    logger.warning("honeypot_no_route", token=token_mint[:8])
+                elif response.status in (400, 422):
+                    # Jupiter explicitly rejected — likely honeypot or invalid token
+                    logger.warning("honeypot_no_route", token=token_mint[:8], status=response.status)
                     return True
+                else:
+                    # Server error, rate limit, etc — not a honeypot signal
+                    logger.warning("honeypot_check_inconclusive", token=token_mint[:8], status=response.status)
+                    return False  # Don't block trades due to API issues
+
+        except (aiohttp.ClientConnectorError, aiohttp.ClientError, OSError) as e:
+            # Network/DNS issues — API is unreachable, NOT a honeypot signal
+            logger.warning("honeypot_check_unreachable", token=token_mint[:8], error=str(e)[:80])
+            return False  # Allow the trade — network issues != honeypot
 
         except Exception as e:
             logger.error("honeypot_check_error", error=str(e))
-            # If we can't check, err on the side of caution
-            return True
+            return False  # Don't block trades on unexpected errors
