@@ -9,10 +9,11 @@ Runs as a background loop alongside the wallet monitor:
 - If price hits stop-loss -> sell everything
 - Updates unrealized PnL for reporting
 
-Exit rules vary by signal source type (Session 9):
-- Human wallets: TP at 3x, SL at -40%, max hold 24h
-- Bot wallets:   TP at 1.5x, SL at -20%, max hold 2h
-- Consensus:     TP at 5x, SL at -30%, max hold 48h
+Exit strategy: "De-risk, then ride" (Session 9)
+- Tiered take-profits: recover initial early, let house money run
+- Different tiers per signal source type (human/bot/consensus)
+- Max hold times force exits on stale positions
+- Future: momentum-based exits using volume + smart wallet mirroring
 """
 
 import asyncio
@@ -28,11 +29,36 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Exit rules by signal source type: (take_profit_multiplier, stop_loss_pct, max_hold_hours)
+# Tiered exit rules by signal source type
+# Each has multiple TP levels: recover initial first, then let profits ride
+# sl_multiplier: price multiple at which we stop-loss (0.6 = sell at -40%)
 EXIT_RULES = {
-    "human":     {"tp_multiplier": 3.0, "tp_pct": 1.0, "sl_multiplier": 0.6,  "max_hold_hours": 24},
-    "bot":       {"tp_multiplier": 1.5, "tp_pct": 1.0, "sl_multiplier": 0.8,  "max_hold_hours": 2},
-    "consensus": {"tp_multiplier": 5.0, "tp_pct": 0.5, "sl_multiplier": 0.7,  "max_hold_hours": 48},
+    "human": {
+        "tp_levels": [
+            {"multiplier": 2.0, "pct": 0.50},   # 2x: sell 50% (initial back)
+            {"multiplier": 4.0, "pct": 0.50},   # 4x: sell 25% of original (lock profit)
+            {"multiplier": 8.0, "pct": 1.00},   # 8x: sell remaining 25% (moonshot captured)
+        ],
+        "sl_multiplier": 0.6,
+        "max_hold_hours": 24,
+    },
+    "bot": {
+        "tp_levels": [
+            {"multiplier": 1.5, "pct": 0.50},   # 1.5x: sell 50% (initial back fast)
+            {"multiplier": 2.5, "pct": 1.00},   # 2.5x: sell remaining (bots exit quick)
+        ],
+        "sl_multiplier": 0.8,
+        "max_hold_hours": 2,
+    },
+    "consensus": {
+        "tp_levels": [
+            {"multiplier": 2.0, "pct": 0.33},   # 2x: sell 33% (initial back)
+            {"multiplier": 5.0, "pct": 0.50},   # 5x: sell 33% of original (profit locked)
+            {"multiplier": 10.0, "pct": 1.00},  # 10x: sell remaining 34% (full moonshot)
+        ],
+        "sl_multiplier": 0.7,
+        "max_hold_hours": 48,
+    },
 }
 
 
@@ -158,15 +184,18 @@ class PositionManager:
                         await self.executor.execute_sell(position, 1.0, "stop_loss")
                     continue
 
-                # Check take-profit (wallet-type-aware)
-                # Use stored TP levels if they exist, otherwise use the exit rules
+                # Check take-profit (tiered, wallet-type-aware)
+                # Use stored TP levels if they exist, otherwise generate from exit rules
                 tp_levels = position.get("take_profit_levels", "[]")
                 if isinstance(tp_levels, str):
                     tp_levels = json.loads(tp_levels)
 
-                # If no custom TP levels, use wallet-type rules
+                # If no custom TP levels stored, build from wallet-type exit rules
                 if not tp_levels:
-                    tp_levels = [{"multiplier": rules["tp_multiplier"], "pct": rules["tp_pct"], "hit": False}]
+                    tp_levels = [
+                        {"multiplier": lv["multiplier"], "pct": lv["pct"], "hit": False}
+                        for lv in rules["tp_levels"]
+                    ]
 
                 for i, level in enumerate(tp_levels):
                     if level.get("hit"):
