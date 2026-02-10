@@ -34,6 +34,11 @@ class SignalGenerator:
     """
     Validates and enriches raw buy signals before sending to trade executor.
 
+    Hybrid strategy: position sizing varies by wallet type.
+    - Human wallets (<50 trades/day): full position size
+    - Bot wallets (50+ trades/day): half position size (faster but riskier)
+    - Consensus (2+ wallets buy same token in 5 min): double position size
+
     Usage:
         sig_gen = SignalGenerator(settings, db)
         await sig_gen.initialize()
@@ -44,6 +49,9 @@ class SignalGenerator:
         self.settings = settings
         self.db = db
         self.session: aiohttp.ClientSession | None = None
+        # Track recent buy signals for consensus detection
+        # {token_mint: [(wallet_address, timestamp), ...]}
+        self._recent_buys: dict[str, list[tuple[str, float]]] = {}
 
     async def initialize(self) -> None:
         """Set up HTTP session for API calls."""
@@ -131,11 +139,41 @@ class SignalGenerator:
             await self.db.mark_signal_skipped(signal.get("signal_id", 0), "honeypot_detected")
             return False, signal, "Honeypot detected — token cannot be sold"
 
-        # All checks passed!
+        # All checks passed! Now determine wallet type and position size.
+
+        # Detect wallet type: human vs bot
+        wallet_type = await self._get_wallet_type(signal["wallet_address"])
+        signal["signal_source_type"] = wallet_type
+
+        # Check for consensus (2+ wallets buying same token within window)
+        now_ts = datetime.now(timezone.utc).timestamp()
+        self._record_buy(token_mint, signal["wallet_address"], now_ts)
+        consensus_count = self._check_consensus(token_mint, now_ts)
+
+        if consensus_count >= 2:
+            signal["signal_source_type"] = "consensus"
+            signal["consensus_count"] = consensus_count
+
+        # Set position size based on wallet type
+        base_size = self.settings.default_position_size_sol
+        source_type = signal["signal_source_type"]
+
+        if source_type == "consensus":
+            position_size = base_size * self.settings.consensus_position_multiplier
+        elif source_type == "bot":
+            position_size = base_size * self.settings.bot_position_multiplier
+        else:
+            position_size = base_size
+
+        signal["position_size_sol"] = position_size
+
         logger.info(
             "signal_validated",
             token=signal.get("token_symbol", token_mint[:8]),
             wallet=signal["wallet_address"][:8] + "...",
+            wallet_type=source_type,
+            position_size=f"{position_size:.4f} SOL",
+            consensus=consensus_count if consensus_count >= 2 else None,
             liquidity=f"${token_data.get('liquidity_usd', 0):,.0f}" if token_data else "unknown",
             confidence=f"{signal.get('confidence', 0):.2f}",
         )
@@ -175,6 +213,58 @@ class SignalGenerator:
         except Exception as e:
             logger.error("token_data_error", error=str(e))
             return None
+
+    async def _get_wallet_type(self, wallet_address: str) -> str:
+        """
+        Determine if a wallet is human or bot based on its is_bot_speed flag.
+        Returns 'human' or 'bot'.
+        """
+        try:
+            sql = "SELECT is_bot_speed, gmgn_buy_30d, gmgn_sell_30d FROM wallets WHERE address = ?"
+            cursor = await self.db.connection.execute(sql, (wallet_address,))
+            row = await cursor.fetchone()
+            if row:
+                # Check the stored flag first
+                if row["is_bot_speed"]:
+                    return "bot"
+                # Fallback: calculate from trade frequency
+                buy_30d = row["gmgn_buy_30d"] or 0
+                sell_30d = row["gmgn_sell_30d"] or 0
+                trades_per_day = (buy_30d + sell_30d) / 30
+                if trades_per_day >= self.settings.bot_speed_threshold:
+                    return "bot"
+        except Exception:
+            pass
+        return "human"
+
+    def _record_buy(self, token_mint: str, wallet_address: str, timestamp: float) -> None:
+        """Record a buy signal for consensus detection."""
+        if token_mint not in self._recent_buys:
+            self._recent_buys[token_mint] = []
+        self._recent_buys[token_mint].append((wallet_address, timestamp))
+
+        # Clean up old entries beyond the consensus window
+        window = self.settings.consensus_window_seconds
+        self._recent_buys[token_mint] = [
+            (w, t) for w, t in self._recent_buys[token_mint]
+            if timestamp - t <= window
+        ]
+
+    def _check_consensus(self, token_mint: str, now_ts: float) -> int:
+        """
+        Count how many unique wallets bought this token within the consensus window.
+        Returns the count of unique wallets.
+        """
+        if token_mint not in self._recent_buys:
+            return 0
+
+        window = self.settings.consensus_window_seconds
+        recent = self._recent_buys[token_mint]
+        unique_wallets = set()
+        for wallet, ts in recent:
+            if now_ts - ts <= window:
+                unique_wallets.add(wallet)
+        return len(unique_wallets)
 
     async def _check_honeypot(self, token_mint: str) -> bool:
         """

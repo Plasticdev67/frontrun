@@ -76,6 +76,9 @@ class Database:
             ("wallets", "gmgn_sell_30d", "INTEGER DEFAULT 0"),
             ("wallets", "gmgn_tags", "TEXT"),
             ("wallets", "source", "TEXT DEFAULT 'manual'"),
+            # Session 9: bot speed tagging + wallet-type exit rules
+            ("wallets", "is_bot_speed", "BOOLEAN DEFAULT FALSE"),
+            ("positions", "signal_source_type", "TEXT DEFAULT 'human'"),
             # Agent decision outcome columns (Session 8)
             ("agent_decisions", "outcome_multiplier", "REAL"),
         ]
@@ -409,8 +412,8 @@ class Database:
             INSERT INTO positions (
                 token_mint, token_symbol, entry_price_usd, amount_sol_invested,
                 amount_tokens_held, take_profit_levels, stop_loss_price,
-                triggered_by_wallet
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                triggered_by_wallet, signal_source_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         cursor = await self.connection.execute(sql, (
             position_data["token_mint"],
@@ -421,6 +424,7 @@ class Database:
             tp_levels_json,
             position_data.get("stop_loss_price"),
             position_data.get("triggered_by_wallet"),
+            position_data.get("signal_source_type", "human"),
         ))
         await self.connection.commit()
         return cursor.lastrowid
@@ -746,6 +750,33 @@ class Database:
         if not row:
             return {}
         return dict(row)
+
+    # =========================================================================
+    # Wallet Refresh Helpers (Session 9: Living Wallet Pool)
+    # =========================================================================
+
+    async def get_copy_performance_by_wallet(self) -> dict[str, float]:
+        """
+        Calculate net PnL per triggering wallet from closed positions.
+        Returns {wallet_address: net_pnl_sol} for wallets that have closed positions.
+        Used by the wallet refresher to reward/penalise wallets based on our results.
+        """
+        sql = """
+            SELECT triggered_by_wallet, COALESCE(SUM(realized_pnl_sol), 0) as net_pnl
+            FROM positions
+            WHERE status = 'closed' AND triggered_by_wallet IS NOT NULL
+            GROUP BY triggered_by_wallet
+        """
+        cursor = await self.connection.execute(sql)
+        rows = await cursor.fetchall()
+        return {row["triggered_by_wallet"]: float(row["net_pnl"]) for row in rows}
+
+    async def get_all_wallets(self) -> list[dict]:
+        """Get all wallets (not just monitored) — used by the refresher for ranking."""
+        sql = "SELECT * FROM wallets ORDER BY total_score DESC"
+        cursor = await self.connection.execute(sql)
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
 
     # =========================================================================
     # Wallet Wipe (preserves tokens, signals, trades, positions)

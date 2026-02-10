@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS wallets (
     is_flagged BOOLEAN DEFAULT FALSE,      -- True if this wallet looks suspicious
     flag_reason TEXT,                       -- Why it was flagged (bot, insider, dev, etc.)
     is_monitored BOOLEAN DEFAULT FALSE,    -- True if we're actively watching this wallet
+    is_bot_speed BOOLEAN DEFAULT FALSE,    -- True if wallet trades 50+/day (bot-like speed)
 
     -- Timestamps
     first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -203,6 +204,7 @@ CREATE TABLE IF NOT EXISTS positions (
 
     -- Context
     triggered_by_wallet TEXT,              -- Which wallet prompted this position
+    signal_source_type TEXT DEFAULT 'human', -- 'human', 'bot', or 'consensus' — determines exit rules
     num_buys INTEGER DEFAULT 1,           -- How many times we've bought this token
     status TEXT DEFAULT 'open',            -- "open" or "closed"
     close_reason TEXT,                     -- "take_profit", "stop_loss", "manual", "kill_switch"

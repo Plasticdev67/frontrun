@@ -276,6 +276,45 @@ class Settings:
     )
 
     # =========================================================================
+    # Wallet Refresh Cycle (Session 9 — Living Wallet Pool)
+    # =========================================================================
+
+    # How often to re-scan GMGN for fresh smart money (seconds, default 6 hours)
+    wallet_refresh_interval: int = field(
+        default_factory=lambda: _get_env_int("WALLET_REFRESH_INTERVAL", 21600)
+    )
+
+    # How many wallets to auto-monitor (top N by ranking score)
+    wallet_refresh_top_n: int = field(
+        default_factory=lambda: _get_env_int("WALLET_REFRESH_TOP_N", 20)
+    )
+
+    # Minimum trades in 30 days to be considered consistent (not a one-hit wonder)
+    wallet_min_trades_30d: int = field(
+        default_factory=lambda: _get_env_int("WALLET_MIN_TRADES_30D", 30)
+    )
+
+    # Trades/day threshold above which a wallet is flagged as bot-speed
+    bot_speed_threshold: int = field(
+        default_factory=lambda: _get_env_int("BOT_SPEED_THRESHOLD", 50)
+    )
+
+    # Position multiplier for bot-speed wallet signals (smaller = more cautious)
+    bot_position_multiplier: float = field(
+        default_factory=lambda: _get_env_float("BOT_POSITION_MULTIPLIER", 0.5)
+    )
+
+    # Position multiplier for consensus signals (2+ wallets buy same token)
+    consensus_position_multiplier: float = field(
+        default_factory=lambda: _get_env_float("CONSENSUS_POSITION_MULTIPLIER", 2.0)
+    )
+
+    # Time window for consensus detection (seconds)
+    consensus_window_seconds: int = field(
+        default_factory=lambda: _get_env_int("CONSENSUS_WINDOW_SECONDS", 300)
+    )
+
+    # =========================================================================
     # Agent Brain (Session 8 — Autonomous Decision Engine)
     # =========================================================================
 

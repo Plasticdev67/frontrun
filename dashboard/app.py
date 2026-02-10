@@ -67,6 +67,8 @@ async def run_db_migrations():
         ("wallets", "gmgn_sell_30d", "INTEGER DEFAULT 0"),
         ("wallets", "gmgn_tags", "TEXT"),
         ("wallets", "source", "TEXT DEFAULT 'manual'"),
+        ("wallets", "is_bot_speed", "BOOLEAN DEFAULT FALSE"),
+        ("positions", "signal_source_type", "TEXT DEFAULT 'human'"),
         ("agent_decisions", "outcome_multiplier", "REAL"),
     ]
     # Also create new tables if they don't exist
@@ -1009,6 +1011,40 @@ async def api_toggle_monitor(address: str):
         await db.execute("UPDATE wallets SET is_monitored = ? WHERE address = ?", (new_state, address))
         await db.commit()
         return {"address": address, "is_monitored": new_state}
+    finally:
+        await db.close()
+
+
+@app.get("/api/refresh_status")
+async def api_refresh_status():
+    """Get wallet pool refresh status — pool size, monitored count, bot count."""
+    db = await get_db()
+    try:
+        # Count GMGN wallets (the refresh pool)
+        cursor = await db.execute("SELECT COUNT(*) as total FROM wallets WHERE source = 'gmgn'")
+        row = await cursor.fetchone()
+        pool_size = row["total"] if row else 0
+
+        # Count monitored
+        cursor = await db.execute("SELECT COUNT(*) as total FROM wallets WHERE is_monitored = 1")
+        row = await cursor.fetchone()
+        monitored = row["total"] if row else 0
+
+        # Count bot-speed wallets
+        bot_count = 0
+        try:
+            cursor = await db.execute("SELECT COUNT(*) as total FROM wallets WHERE is_bot_speed = 1")
+            row = await cursor.fetchone()
+            bot_count = row["total"] if row else 0
+        except Exception:
+            pass  # Column may not exist yet
+
+        return {
+            "pool_size": pool_size,
+            "monitored": monitored,
+            "bot_speed_count": bot_count,
+            "refresh_interval_hours": settings.wallet_refresh_interval / 3600,
+        }
     finally:
         await db.close()
 

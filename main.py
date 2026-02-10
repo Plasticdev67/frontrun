@@ -671,12 +671,27 @@ async def main() -> None:
             print(f"  Learning cycle: every {settings.agent_learn_interval}s")
             print(f"{'='*60}\n")
 
+            # Wallet refresh loop (re-ranks pool every N hours)
+            async def wallet_refresh_loop():
+                """Periodically refresh the wallet pool from GMGN."""
+                from analyzer.wallet_refresher import WalletRefresher
+                refresher = WalletRefresher(settings, db)
+                await asyncio.sleep(300)  # Wait 5 min after startup
+                while True:
+                    try:
+                        summary = await refresher.refresh()
+                        logger.info("wallet_pool_refreshed", **summary)
+                    except Exception as e:
+                        logger.error("wallet_refresh_error", error=str(e))
+                    await asyncio.sleep(settings.wallet_refresh_interval)
+
             try:
                 await asyncio.gather(
                     monitor.start(),
                     pos_manager.start(),
                     agent_loop(),
                     learning_loop(),
+                    wallet_refresh_loop(),
                 )
             except asyncio.CancelledError:
                 pass
@@ -752,12 +767,37 @@ async def main() -> None:
                 note="All systems running. Monitoring wallets.",
             )
 
-            # Run monitor, position manager, and Telegram bot concurrently
+            # Wallet refresh loop (re-ranks pool every N hours)
+            async def wallet_refresh_loop():
+                """Periodically refresh the wallet pool from GMGN."""
+                from analyzer.wallet_refresher import WalletRefresher
+                refresher = WalletRefresher(settings, db)
+                await asyncio.sleep(300)  # Wait 5 min after startup
+                while True:
+                    try:
+                        summary = await refresher.refresh()
+                        logger.info("wallet_pool_refreshed", **summary)
+                        # Notify via Telegram
+                        promoted = summary.get("promoted", [])
+                        demoted = summary.get("demoted", [])
+                        if promoted or demoted:
+                            msg = f"Wallet pool refreshed: {summary.get('monitored', 0)} monitored"
+                            if promoted:
+                                msg += f"\nPromoted: {', '.join(promoted)}"
+                            if demoted:
+                                msg += f"\nDemoted: {', '.join(demoted)}"
+                            await notifier.notify_error(msg)  # Reuse error notifier for alerts
+                    except Exception as e:
+                        logger.error("wallet_refresh_error", error=str(e))
+                    await asyncio.sleep(settings.wallet_refresh_interval)
+
+            # Run monitor, position manager, Telegram bot, and wallet refresh concurrently
             try:
                 await asyncio.gather(
                     monitor.start(),
                     pos_manager.start(),
                     tg_bot.start(),
+                    wallet_refresh_loop(),
                 )
             except asyncio.CancelledError:
                 pass

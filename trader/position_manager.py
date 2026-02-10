@@ -9,16 +9,14 @@ Runs as a background loop alongside the wallet monitor:
 - If price hits stop-loss -> sell everything
 - Updates unrealized PnL for reporting
 
-Take-profit strategy (configurable):
-- Default: Sell 50% at 2x, sell remaining 100% at 5x
-- This locks in profits while keeping upside exposure
-
-Stop-loss:
-- Default: Sell everything if price drops 50% from entry
-- This prevents a single bad trade from wiping out gains
+Exit rules vary by signal source type (Session 9):
+- Human wallets: TP at 3x, SL at -40%, max hold 24h
+- Bot wallets:   TP at 1.5x, SL at -20%, max hold 2h
+- Consensus:     TP at 5x, SL at -30%, max hold 48h
 """
 
 import asyncio
+from datetime import datetime, timezone
 from typing import Any
 import json
 
@@ -29,6 +27,13 @@ from database.db import Database
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Exit rules by signal source type: (take_profit_multiplier, stop_loss_pct, max_hold_hours)
+EXIT_RULES = {
+    "human":     {"tp_multiplier": 3.0, "tp_pct": 1.0, "sl_multiplier": 0.6,  "max_hold_hours": 24},
+    "bot":       {"tp_multiplier": 1.5, "tp_pct": 1.0, "sl_multiplier": 0.8,  "max_hold_hours": 2},
+    "consensus": {"tp_multiplier": 5.0, "tp_pct": 0.5, "sl_multiplier": 0.7,  "max_hold_hours": 48},
+}
 
 
 class PositionManager:
@@ -84,7 +89,7 @@ class PositionManager:
                 await asyncio.sleep(self.settings.position_check_interval)
 
     async def _check_positions(self, positions: list[dict]) -> None:
-        """Check all open positions for TP/SL triggers."""
+        """Check all open positions for TP/SL triggers using wallet-type exit rules."""
         for position in positions:
             try:
                 token_mint = position["token_mint"]
@@ -109,23 +114,59 @@ class PositionManager:
                     position["id"], current_price, unrealized_pnl
                 )
 
-                # Check stop-loss
-                if price_multiplier <= self.settings.stop_loss_multiplier:
+                # Get exit rules for this position's signal source type
+                source_type = position.get("signal_source_type", "human") or "human"
+                rules = EXIT_RULES.get(source_type, EXIT_RULES["human"])
+
+                # Check max hold time
+                opened_at = position.get("opened_at")
+                if opened_at:
+                    try:
+                        if isinstance(opened_at, str):
+                            open_time = datetime.fromisoformat(opened_at.replace("Z", "+00:00"))
+                        else:
+                            open_time = opened_at
+                        now = datetime.now(timezone.utc)
+                        hours_held = (now - open_time).total_seconds() / 3600
+                        if hours_held >= rules["max_hold_hours"]:
+                            logger.warning(
+                                "MAX_HOLD_EXPIRED",
+                                token=token_symbol,
+                                source_type=source_type,
+                                hours_held=f"{hours_held:.1f}h",
+                                max_hours=rules["max_hold_hours"],
+                            )
+                            if self.executor:
+                                await self.executor.execute_sell(position, 1.0, "max_hold_time")
+                            continue
+                    except (ValueError, TypeError):
+                        pass  # Can't parse timestamp, skip hold check
+
+                # Check stop-loss (wallet-type-aware)
+                sl_multiplier = rules["sl_multiplier"]
+                if price_multiplier <= sl_multiplier:
                     logger.warning(
                         "STOP_LOSS_TRIGGERED",
                         token=token_symbol,
+                        source_type=source_type,
                         entry=f"${entry_price:.8f}",
                         current=f"${current_price:.8f}",
                         drop=f"{(1-price_multiplier)*100:.1f}%",
+                        sl_level=f"{(1-sl_multiplier)*100:.0f}%",
                     )
                     if self.executor:
                         await self.executor.execute_sell(position, 1.0, "stop_loss")
                     continue
 
-                # Check take-profit levels
+                # Check take-profit (wallet-type-aware)
+                # Use stored TP levels if they exist, otherwise use the exit rules
                 tp_levels = position.get("take_profit_levels", "[]")
                 if isinstance(tp_levels, str):
                     tp_levels = json.loads(tp_levels)
+
+                # If no custom TP levels, use wallet-type rules
+                if not tp_levels:
+                    tp_levels = [{"multiplier": rules["tp_multiplier"], "pct": rules["tp_pct"], "hit": False}]
 
                 for i, level in enumerate(tp_levels):
                     if level.get("hit"):
@@ -136,6 +177,7 @@ class PositionManager:
                         logger.info(
                             "TAKE_PROFIT_TRIGGERED",
                             token=token_symbol,
+                            source_type=source_type,
                             level=f"{level['multiplier']}x",
                             sell_pct=f"{sell_pct*100:.0f}%",
                             current_price=f"${current_price:.8f}",
