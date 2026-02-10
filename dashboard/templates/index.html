@@ -262,6 +262,46 @@
         }
 
         /* ========================================
+           LAUREL WREATH REFRESH BUTTON
+           ======================================== */
+        .laurel-refresh {
+            background: none;
+            border: 1.5px solid var(--border-color);
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--accent-gold);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .laurel-refresh:hover {
+            border-color: var(--accent-gold);
+            background: rgba(184, 150, 12, 0.06);
+            transform: scale(1.05);
+        }
+        .laurel-refresh:active {
+            transform: scale(0.95);
+        }
+        .laurel-refresh.syncing .laurel-icon {
+            animation: laurelSpin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+        .laurel-refresh.syncing {
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 12px rgba(184, 150, 12, 0.2);
+        }
+        @keyframes laurelSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .laurel-icon {
+            transition: transform 0.3s ease;
+        }
+
+        /* ========================================
            NAVIGATION
            ======================================== */
         .nav-roman {
@@ -1087,16 +1127,31 @@
                     <div class="brand-subtitle">Veni, Vidi, Traded</div>
                 </div>
             </div>
-            <div class="header-status">
+            <div class="header-status" style="display:flex; align-items:center; gap:16px;">
+                <button class="laurel-refresh" id="refreshBtn" onclick="manualRefresh()" title="Refresh data">
+                    <svg class="laurel-icon" id="laurelIcon" viewBox="0 0 40 40" width="36" height="36">
+                        <!-- Left laurel branch -->
+                        <path d="M20 4 C16 8, 10 10, 8 14 C6 18, 7 22, 8 24 C10 20, 12 16, 16 12 C14 16, 12 20, 12 26 C14 22, 16 18, 18 14 C16 18, 15 24, 16 30 C18 26, 19 20, 20 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                        <!-- Right laurel branch -->
+                        <path d="M20 4 C24 8, 30 10, 32 14 C34 18, 33 22, 32 24 C30 20, 28 16, 24 12 C26 16, 28 20, 28 26 C26 22, 24 18, 22 14 C24 18, 25 24, 24 30 C22 26, 21 20, 20 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                        <!-- Small berries/dots -->
+                        <circle cx="9" cy="15" r="1" fill="currentColor" opacity="0.6"/>
+                        <circle cx="31" cy="15" r="1" fill="currentColor" opacity="0.6"/>
+                        <circle cx="12" cy="24" r="1" fill="currentColor" opacity="0.6"/>
+                        <circle cx="28" cy="24" r="1" fill="currentColor" opacity="0.6"/>
+                    </svg>
+                </button>
                 <div>
-                    <span class="pulse-dot" id="status-dot"></span>
-                    <span id="status-text" style="font-size: 12px; letter-spacing: 1px; font-weight: 500;">INITIALIZING</span>
-                </div>
-                <div style="margin-top: 4px;">
-                    <span id="mode-badge" style="font-size: 11px; color: var(--accent-amber); letter-spacing: 1px;">---</span>
-                </div>
-                <div style="margin-top: 4px; font-size: 10px; color: var(--text-dim);" id="last-refresh">
-                    Last sync: --:--:--
+                    <div>
+                        <span class="pulse-dot" id="status-dot"></span>
+                        <span id="status-text" style="font-size: 12px; letter-spacing: 1px; font-weight: 500;">INITIALIZING</span>
+                    </div>
+                    <div style="margin-top: 4px;">
+                        <span id="mode-badge" style="font-size: 11px; color: var(--accent-amber); letter-spacing: 1px;">---</span>
+                    </div>
+                    <div style="margin-top: 4px; font-size: 10px; color: var(--text-dim);" id="last-refresh">
+                        Last sync: --:--:--
+                    </div>
                 </div>
             </div>
         </div>
@@ -1177,8 +1232,14 @@ function enterApp() {
     AudioSystem.startMusic();
     document.getElementById('musicBars')?.classList.add('playing');
     document.getElementById('splash').classList.add('hidden');
+    // Remember we've entered — skip splash on page refresh
+    sessionStorage.setItem('rome_entered', '1');
 }
-// Splash only dismisses on click — no auto-enter
+
+// Auto-skip splash if already entered this session (browser refresh)
+if (sessionStorage.getItem('rome_entered')) {
+    document.getElementById('splash').classList.add('hidden');
+}
 
 // =========================================================================
 // Tab Navigation
@@ -1275,6 +1336,20 @@ function updateRefreshTimer() {
     const now = new Date();
     document.getElementById('last-refresh').textContent =
         'Last sync: ' + now.toLocaleTimeString('en-US', { hour12: false });
+}
+
+async function manualRefresh() {
+    const btn = document.getElementById('refreshBtn');
+    if (btn.classList.contains('syncing')) return; // Prevent double-click
+    btn.classList.add('syncing');
+    AudioSystem.playClick();
+    try {
+        await loadTab(activeTab);
+    } catch (e) {
+        console.error('Refresh failed:', e);
+    }
+    // Keep spinning for at least 800ms so the animation is visible
+    setTimeout(() => btn.classList.remove('syncing'), 800);
 }
 
 // =========================================================================
@@ -1389,7 +1464,7 @@ async function showWalletDetail(address) {
     if (!data || !data.wallet) { closeModal(); return; }
 
     const w = data.wallet;
-    const wr = w.win_rate || 0;
+    const wr = w.gmgn_winrate != null ? w.gmgn_winrate * 100 : (w.win_rate || 0);
     const wrColor = wr >= 60 ? 'var(--accent-green)' : wr >= 40 ? '#8b6914' : 'var(--text-dim)';
     let html = `
         <div style="margin-bottom:20px;">
@@ -2124,7 +2199,9 @@ async function loadSmartMoney() {
     `;
 
     data.wallets.forEach((w, i) => {
-        const wr = w.win_rate || 0;
+        // Use GMGN winrate (0-1 decimal) if available, else fall back to local win_rate (0-100)
+        const wrRaw = w.gmgn_winrate != null ? w.gmgn_winrate * 100 : (w.win_rate || 0);
+        const wr = wrRaw;
         const wrColor = wr >= 60 ? 'var(--accent-green)' : wr >= 40 ? '#8b6914' : 'var(--text-dim)';
         const cluster = w.cluster;
         const sideWallets = cluster ? (cluster.side_wallets || []) : [];
