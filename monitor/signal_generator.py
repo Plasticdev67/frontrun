@@ -19,6 +19,7 @@ if we should follow.
 """
 
 import asyncio
+import time
 from datetime import datetime, timezone
 
 import aiohttp
@@ -28,6 +29,11 @@ from database.db import Database
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Minimum token age in seconds before we'll copy a buy.
+# Tokens younger than this are likely fresh launches where the buyer may be
+# the creator/deployer — classic pump-and-dump pattern.
+MIN_TOKEN_AGE_SECONDS = 300  # 5 minutes
 
 
 class SignalGenerator:
@@ -141,6 +147,22 @@ class SignalGenerator:
         if is_honeypot:
             await self.db.mark_signal_skipped(signal.get("signal_id", 0), "honeypot_detected")
             return False, signal, "Honeypot detected — token cannot be sold"
+
+        # Check 8: Token age — skip very new tokens (likely fresh launches)
+        # Token creators buy their own token immediately after launch → pump & dump
+        token_age = await self._get_token_age(token_mint)
+        if token_age is not None and token_age < MIN_TOKEN_AGE_SECONDS:
+            reason = f"Token too new ({token_age:.0f}s old, min {MIN_TOKEN_AGE_SECONDS}s) — likely fresh launch"
+            await self.db.mark_signal_skipped(signal.get("signal_id", 0), "token_too_new")
+            return False, signal, reason
+
+        # Check 9: Creator detection — is the buyer also the token deployer?
+        # Classic rug: creator launches token, "buys" it, price spikes, then dumps
+        is_creator = await self._is_token_creator(token_mint, signal["wallet_address"])
+        if is_creator:
+            reason = "Wallet is the token creator/deployer — likely pump & dump"
+            await self.db.mark_signal_skipped(signal.get("signal_id", 0), "creator_wallet")
+            return False, signal, reason
 
         # All checks passed! Now determine wallet type and position size.
 
@@ -368,3 +390,84 @@ class SignalGenerator:
         except Exception as e:
             logger.error("honeypot_check_error", error=str(e))
             return False  # Don't block trades on unexpected errors
+
+    async def _get_token_age(self, token_mint: str) -> float | None:
+        """
+        Get the age of a token in seconds by checking when its mint was created.
+
+        Uses DexScreener pairCreatedAt timestamp (fastest/easiest check).
+        Returns None if we can't determine the age (fail open — don't block).
+        """
+        try:
+            url = f"https://api.dexscreener.com/latest/dex/tokens/{token_mint}"
+            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    pairs = data.get("pairs") or []
+                    if pairs:
+                        # Use the earliest pair creation time
+                        earliest = None
+                        for pair in pairs:
+                            created_at = pair.get("pairCreatedAt")
+                            if created_at:
+                                if earliest is None or created_at < earliest:
+                                    earliest = created_at
+                        if earliest:
+                            age_seconds = (time.time() * 1000 - earliest) / 1000
+                            return max(0, age_seconds)
+        except Exception as e:
+            logger.debug("token_age_check_error", error=str(e))
+        return None  # Can't determine — fail open
+
+    async def _is_token_creator(self, token_mint: str, wallet_address: str) -> bool:
+        """
+        Check if the given wallet created/deployed this token.
+
+        Uses Helius DAS API to look up the token's mint authority.
+        If the buying wallet is the creator, it's a classic rug setup:
+        deploy token → buy it yourself → others copy → dump.
+
+        Returns True if the wallet IS the creator, False otherwise.
+        On API errors returns False (fail open — don't block trades).
+        """
+        try:
+            rpc_url = f"https://mainnet.helius-rpc.com/?api-key={self.settings.helius_api_key}"
+            payload = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "getAsset",
+                "params": {"id": token_mint},
+            }
+            async with self.session.post(
+                rpc_url, json=payload, timeout=aiohttp.ClientTimeout(total=5)
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    result = data.get("result", {})
+
+                    # Check authorities — creator/mint authority/update authority
+                    authorities = result.get("authorities", [])
+                    for auth in authorities:
+                        if auth.get("address") == wallet_address:
+                            logger.warning(
+                                "CREATOR_DETECTED",
+                                token=token_mint[:8],
+                                wallet=wallet_address[:8],
+                                scopes=auth.get("scopes", []),
+                            )
+                            return True
+
+                    # Also check creators list in the metadata
+                    creators = result.get("creators", [])
+                    for creator in creators:
+                        if creator.get("address") == wallet_address:
+                            logger.warning(
+                                "CREATOR_DETECTED_METADATA",
+                                token=token_mint[:8],
+                                wallet=wallet_address[:8],
+                            )
+                            return True
+
+        except Exception as e:
+            logger.debug("creator_check_error", error=str(e))
+        return False  # Can't determine — fail open

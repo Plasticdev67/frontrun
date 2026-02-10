@@ -283,6 +283,45 @@ class TradeExecutor:
         if signal.get("signal_id"):
             await self.db.mark_signal_executed(signal["signal_id"], trade_id)
 
+        # Open a position record so the position manager can track TP/SL
+        # Even in dry_run we need positions to simulate the full lifecycle
+        import json
+        source_type = signal.get("signal_source_type", "human") or "human"
+        from trader.position_manager import EXIT_RULES
+        rules = EXIT_RULES.get(source_type, EXIT_RULES["human"])
+        tp_levels = [
+            {"multiplier": lv["multiplier"], "pct": lv["pct"], "hit": False}
+            for lv in rules["tp_levels"]
+        ]
+
+        # Estimate tokens received (for sell calculations later)
+        # In dry_run we don't have real swap output, so estimate from price
+        estimated_tokens = 0
+        if price_usd and price_usd > 0:
+            sol_price_usd = await self._get_sol_price()
+            if sol_price_usd:
+                estimated_tokens = int((position_size * sol_price_usd / price_usd) * 1_000_000)
+
+        await self.db.open_position({
+            "token_mint": token_mint,
+            "token_symbol": token_symbol,
+            "entry_price_usd": price_usd,
+            "amount_sol_invested": position_size,
+            "amount_tokens_held": estimated_tokens,
+            "take_profit_levels": tp_levels,
+            "stop_loss_price": price_usd * rules["sl_multiplier"] if price_usd else None,
+            "triggered_by_wallet": signal["wallet_address"],
+            "signal_source_type": source_type,
+        })
+
+        logger.info(
+            "dry_run_position_opened",
+            token=token_symbol,
+            source_type=source_type,
+            entry_price=f"${price_usd:.8f}" if price_usd else "unknown",
+            tp_levels=[f"{lv['multiplier']}x" for lv in tp_levels],
+        )
+
         return {"trade_id": trade_id, "status": "dry_run"}
 
     async def execute_sell(
@@ -399,6 +438,22 @@ class TradeExecutor:
             "sol_received": sol_received,
             "status": status,
         }
+
+    async def _get_sol_price(self) -> float | None:
+        """Get current SOL price in USD from DexScreener (free, no key)."""
+        try:
+            url = "https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112"
+            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    pairs = data.get("pairs") or []
+                    if pairs:
+                        price = pairs[0].get("priceUsd")
+                        if price:
+                            return float(price)
+        except Exception:
+            pass
+        return None
 
     def _calculate_actual_slippage(self, quote: dict) -> int:
         """
