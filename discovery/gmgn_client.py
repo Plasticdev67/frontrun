@@ -390,10 +390,20 @@ class GMGNClient:
             if profit_30d < min_profit_30d:
                 continue
 
-            # Filter 3: Winrate — REQUIRE it. NULL winrate = unverified = reject.
-            # Previously NULL winrate passed, letting unvetted snipers through.
-            if winrate is None or _float(winrate) < min_winrate:
+            # Filter 3: Winrate — reject if known-bad, skip if NULL
+            # NULL winrate is common (GMGN only tracks it for their "smart money").
+            # If winrate IS available and below threshold, reject.
+            if winrate is not None and _float(winrate) < min_winrate:
                 continue
+
+            # Filter 3b: Profit quality gate — minimum $20 profit per trade
+            # This catches spray-and-pray snipers: $100K from 13K trades = $7/trade (fail)
+            # vs quality trader: $50K from 200 trades = $250/trade (pass)
+            total_trades = buy_30d + sell_30d
+            if total_trades > 0 and profit_30d > 0:
+                profit_per_trade = profit_30d / total_trades
+                if profit_per_trade < 20:
+                    continue
 
             # Filter 4: Activity range (not inactive, not a bot)
             if buy_30d < min_buys_30d or buy_30d > max_buys_30d:
