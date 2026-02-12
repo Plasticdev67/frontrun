@@ -813,11 +813,82 @@ async def api_signals():
         )
         row = await cursor.fetchone()
 
+        # Open positions with current PnL
+        cursor = await db.execute(
+            """SELECT id, token_mint, token_symbol, entry_price_usd, current_price_usd,
+                      amount_sol_invested, amount_tokens_held, unrealized_pnl_sol,
+                      signal_source_type, opened_at, take_profit_levels, stop_loss_price
+               FROM positions WHERE status = 'open' ORDER BY opened_at DESC"""
+        )
+        open_positions = []
+        for r in await cursor.fetchall():
+            d = dict(r)
+            entry = d.get("entry_price_usd") or 0
+            current = d.get("current_price_usd") or 0
+            d["multiplier"] = round(current / entry, 2) if entry > 0 else 0
+            d["age_hours"] = 0
+            if d.get("opened_at"):
+                try:
+                    from datetime import datetime, timezone
+                    opened = datetime.fromisoformat(str(d["opened_at"]).replace("Z", "+00:00"))
+                    d["age_hours"] = round((datetime.now(timezone.utc) - opened).total_seconds() / 3600, 1)
+                except Exception:
+                    pass
+            open_positions.append(d)
+
+        # Recent trades
+        cursor = await db.execute(
+            """SELECT id, token_mint, token_symbol, side, amount_sol, price_usd,
+                      triggered_by_wallet, status, created_at
+               FROM trades ORDER BY created_at DESC LIMIT 50"""
+        )
+        recent_trades = [dict(r) for r in await cursor.fetchall()]
+
+        # Performance summary
+        cursor = await db.execute(
+            """SELECT
+                COALESCE(SUM(amount_sol_invested), 0) as total_invested,
+                COALESCE(SUM(unrealized_pnl_sol), 0) as total_unrealized_pnl,
+                COUNT(*) as position_count,
+                COALESCE(SUM(CASE WHEN unrealized_pnl_sol > 0 THEN 1 ELSE 0 END), 0) as winning,
+                COALESCE(SUM(CASE WHEN unrealized_pnl_sol < 0 THEN 1 ELSE 0 END), 0) as losing,
+                COALESCE(MAX(unrealized_pnl_sol), 0) as best_pnl,
+                COALESCE(MIN(unrealized_pnl_sol), 0) as worst_pnl
+               FROM positions WHERE status = 'open' AND entry_price_usd > 0"""
+        )
+        perf_row = await cursor.fetchone()
+        perf = dict(perf_row) if perf_row else {}
+
+        # Closed positions stats
+        cursor = await db.execute(
+            """SELECT COUNT(*) as closed_count,
+                      COALESCE(SUM(realized_pnl_sol), 0) as realized_pnl,
+                      COALESCE(SUM(CASE WHEN realized_pnl_sol > 0 THEN 1 ELSE 0 END), 0) as closed_wins
+               FROM positions WHERE status = 'closed'"""
+        )
+        closed_row = await cursor.fetchone()
+        if closed_row:
+            perf["closed_count"] = closed_row["closed_count"]
+            perf["realized_pnl"] = closed_row["realized_pnl"]
+            perf["closed_wins"] = closed_row["closed_wins"]
+
+        # Skip reason breakdown
+        cursor = await db.execute(
+            """SELECT skip_reason, COUNT(*) as cnt
+               FROM signals WHERE skip_reason IS NOT NULL
+               GROUP BY skip_reason ORDER BY cnt DESC"""
+        )
+        skip_breakdown = [dict(r) for r in await cursor.fetchall()]
+
         return {
             "signals": signals,
             "today_total": row["total"] if row else 0,
             "today_copied": row["copied"] if row else 0,
             "today_skipped": row["skipped"] if row else 0,
+            "open_positions": open_positions,
+            "recent_trades": recent_trades,
+            "performance": perf,
+            "skip_breakdown": skip_breakdown,
         }
     finally:
         await db.close()

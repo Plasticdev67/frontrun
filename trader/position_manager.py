@@ -121,13 +121,50 @@ class PositionManager:
                 token_mint = position["token_mint"]
                 token_symbol = position.get("token_symbol", token_mint[:8])
 
-                # Get current price
-                current_price = await self._get_current_price(token_mint)
-                if not current_price or current_price <= 0:
+                entry_price = position["entry_price_usd"]
+
+                # --- Auto-close zombie positions ---
+                # If entry_price is $0, we can never calculate PnL. Close immediately.
+                if not entry_price or entry_price <= 0:
+                    logger.warning(
+                        "CLOSING_ZOMBIE_POSITION",
+                        token=token_symbol,
+                        reason="$0 entry price — can't track PnL",
+                    )
+                    if self.executor:
+                        await self.executor.execute_sell(position, 1.0, "dead_token_no_price")
+                    else:
+                        await self.db.close_position(position["id"], "dead_token_no_price", 0)
                     continue
 
-                entry_price = position["entry_price_usd"]
-                if not entry_price or entry_price <= 0:
+                # Get current price
+                current_price = await self._get_current_price(token_mint)
+
+                # If we can't get a price, check how old the position is.
+                # Tokens that go to zero / get rugged won't have price data.
+                # Auto-close after 2 hours of no price data.
+                if not current_price or current_price <= 0:
+                    opened_at = position.get("opened_at")
+                    if opened_at:
+                        try:
+                            if isinstance(opened_at, str):
+                                open_time = datetime.fromisoformat(opened_at.replace("Z", "+00:00"))
+                            else:
+                                open_time = opened_at
+                            hours_held = (datetime.now(timezone.utc) - open_time).total_seconds() / 3600
+                            if hours_held >= 2.0:
+                                logger.warning(
+                                    "CLOSING_DEAD_TOKEN",
+                                    token=token_symbol,
+                                    hours_held=f"{hours_held:.1f}h",
+                                    reason="No price data for 2+ hours — token likely dead",
+                                )
+                                if self.executor:
+                                    await self.executor.execute_sell(position, 1.0, "dead_token_no_price")
+                                else:
+                                    await self.db.close_position(position["id"], "dead_token_no_price", 0)
+                        except (ValueError, TypeError):
+                            pass
                     continue
 
                 # Calculate unrealized PnL

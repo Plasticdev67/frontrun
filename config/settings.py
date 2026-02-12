@@ -261,9 +261,9 @@ class Settings:
         default_factory=lambda: _get_env_int("SM_MIN_BUYS_30D", 5)
     )
 
-    # Maximum buys in last 30 days — anything over 15K is a bot
+    # Maximum buys in last 30 days — over 1500 (~50/day) is a sniper bot
     sm_max_buys_30d: int = field(
-        default_factory=lambda: _get_env_int("SM_MAX_BUYS_30D", 15000)
+        default_factory=lambda: _get_env_int("SM_MAX_BUYS_30D", 1500)
     )
 
     # Minimum SOL balance — must have funds to trade with
@@ -296,10 +296,9 @@ class Settings:
     )
 
     # Trades/day threshold above which a wallet is flagged as bot-speed
-    # Set high (200) because real crypto degens easily do 50-150 trades/day
-    # GMGN tags are the primary bot signal; this is a secondary fallback
+    # Real humans do 5-30 trades/day. 50+ is bot territory.
     bot_speed_threshold: int = field(
-        default_factory=lambda: _get_env_int("BOT_SPEED_THRESHOLD", 200)
+        default_factory=lambda: _get_env_int("BOT_SPEED_THRESHOLD", 50)
     )
 
     # Position multiplier for bot-speed wallet signals (smaller = more cautious)
@@ -315,6 +314,12 @@ class Settings:
     # Time window for consensus detection (seconds)
     consensus_window_seconds: int = field(
         default_factory=lambda: _get_env_int("CONSENSUS_WINDOW_SECONDS", 300)
+    )
+
+    # Consensus-only mode: only execute trades when 2+ wallets buy the same token
+    # Single-wallet signals are still logged but NOT executed
+    consensus_only_mode: bool = field(
+        default_factory=lambda: _get_env("CONSENSUS_ONLY_MODE", "false").lower() == "true"
     )
 
     # =========================================================================

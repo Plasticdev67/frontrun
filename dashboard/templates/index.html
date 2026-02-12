@@ -2309,36 +2309,116 @@ async function loadLiveFeed() {
     const el = document.getElementById('tab-live-feed');
     if (!data) return;
 
+    const perf = data.performance || {};
+    const positions = data.open_positions || [];
+    const trades = data.recent_trades || [];
+    const skipBreak = data.skip_breakdown || [];
+    const totalInvested = perf.total_invested || 0;
+    const totalPnl = perf.total_unrealized_pnl || 0;
+    const posCount = perf.position_count || 0;
+    const winning = perf.winning || 0;
+    const losing = perf.losing || 0;
+    const winRate = posCount > 0 ? ((winning / posCount) * 100).toFixed(0) : '0';
+    const pnlColor = totalPnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+
+    // --- PERFORMANCE SUMMARY ---
     let html = `
         <div class="row g-3 mb-3">
-            <div class="col-md-4 col-4 fade-up">
+            <div class="col-md-3 col-6 fade-up">
                 <div class="rome-card"><div class="card-body-inner text-center" style="padding:16px;">
                     <div class="stat-value">${data.today_total}</div>
                     <div class="stat-label">Signals Today</div>
+                    <div style="font-size:11px; color:var(--text-dim);">${data.today_copied} copied / ${data.today_skipped} skipped</div>
                 </div></div>
             </div>
-            <div class="col-md-4 col-4 fade-up">
+            <div class="col-md-3 col-6 fade-up">
                 <div class="rome-card"><div class="card-body-inner text-center" style="padding:16px;">
-                    <div class="stat-value" style="color:var(--accent-green);">${data.today_copied}</div>
-                    <div class="stat-label">Copied</div>
+                    <div class="stat-value">${fmt(totalInvested, 4)}</div>
+                    <div class="stat-label">SOL Invested</div>
+                    <div style="font-size:11px; color:var(--text-dim);">${posCount} positions open</div>
                 </div></div>
             </div>
-            <div class="col-md-4 col-4 fade-up">
+            <div class="col-md-3 col-6 fade-up">
                 <div class="rome-card"><div class="card-body-inner text-center" style="padding:16px;">
-                    <div class="stat-value" style="color:var(--accent-red);">${data.today_skipped}</div>
-                    <div class="stat-label">Skipped</div>
+                    <div class="stat-value" style="color:${pnlColor};">${totalPnl >= 0 ? '+' : ''}${fmt(totalPnl, 6)}</div>
+                    <div class="stat-label">Unrealized PnL</div>
+                    <div style="font-size:11px; color:var(--text-dim);">${winning}W / ${losing}L</div>
+                </div></div>
+            </div>
+            <div class="col-md-3 col-6 fade-up">
+                <div class="rome-card"><div class="card-body-inner text-center" style="padding:16px;">
+                    <div class="stat-value" style="color:${parseInt(winRate) >= 50 ? 'var(--accent-green)' : 'var(--accent-red)'};">${winRate}%</div>
+                    <div class="stat-label">Win Rate</div>
+                    <div style="font-size:11px; color:var(--text-dim);">Best: ${fmtPnl(perf.best_pnl || 0)} / Worst: ${fmtPnl(perf.worst_pnl || 0)}</div>
                 </div></div>
             </div>
         </div>
     `;
 
+    // --- OPEN POSITIONS ---
+    if (positions.length > 0) {
+        html += `<div class="rome-card mb-3 fade-up">
+            <div class="card-header-rome">
+                <span class="title-text">Open Positions</span>
+                <span class="count-text">${positions.length} active</span>
+            </div>
+            <div class="card-body-inner">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead><tr>
+                            <th>Token</th><th>Entry</th><th>Current</th><th>Mult</th><th>PnL</th><th>Type</th><th>Age</th>
+                        </tr></thead>
+                        <tbody>
+                            ${positions.map(p => {
+                                const entry = p.entry_price_usd || 0;
+                                const current = p.current_price_usd || 0;
+                                const mult = p.multiplier || 0;
+                                const pnl = p.unrealized_pnl_sol || 0;
+                                const multColor = mult >= 2 ? 'var(--accent-green)' : mult >= 1 ? 'var(--accent-amber)' : 'var(--accent-red)';
+                                const typeColor = p.signal_source_type === 'consensus' ? '#b388ff' : p.signal_source_type === 'bot' ? '#90a4ae' : 'var(--accent-gold)';
+                                const age = p.age_hours < 1 ? (p.age_hours * 60).toFixed(0) + 'm' : p.age_hours.toFixed(1) + 'h';
+                                return `<tr>
+                                    <td><span style="color:var(--accent-gold); cursor:pointer;" onclick="showTokenDetail('${p.token_mint}')">${p.token_symbol || shortAddr(p.token_mint)}</span></td>
+                                    <td style="font-size:11px;">$${entry > 0.001 ? entry.toFixed(6) : entry.toExponential(2)}</td>
+                                    <td style="font-size:11px;">$${current > 0.001 ? current.toFixed(6) : current > 0 ? current.toExponential(2) : '0'}</td>
+                                    <td style="color:${multColor}; font-weight:600;">${mult > 0 ? mult.toFixed(2) + 'x' : '\u2014'}</td>
+                                    <td>${fmtPnl(pnl)}</td>
+                                    <td><span style="color:${typeColor}; font-size:11px; font-weight:600; text-transform:uppercase;">${p.signal_source_type || 'human'}</span></td>
+                                    <td style="color:var(--text-dim); font-size:11px;">${age}</td>
+                                </tr>`;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // --- SKIP REASON BREAKDOWN ---
+    if (skipBreak.length > 0) {
+        html += `<div class="rome-card mb-3 fade-up">
+            <div class="card-header-rome"><span class="title-text">Skip Reasons</span></div>
+            <div class="card-body-inner">
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    ${skipBreak.map(s => `
+                        <div style="background:var(--bg-secondary); border:1px solid var(--border-gold); border-radius:6px; padding:6px 12px; font-size:12px;">
+                            <span style="color:var(--accent-red); font-weight:600;">${s.cnt}</span>
+                            <span style="color:var(--text-dim); margin-left:4px;">${s.skip_reason}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // --- SIGNAL FEED ---
     if (data.signals.length === 0) {
         html += `<div class="rome-card fade-up">
             <div class="card-header-rome"><span class="title-text">Signal Feed</span></div>
             <div class="card-body-inner" style="text-align:center; padding:40px;">
                 <div style="font-family:var(--font-serif); font-size:16px; font-style:italic; color:var(--text-dim);">
                     Awaiting signals...<br>
-                    <span style="font-size:12px; font-family:var(--font-body);">Run <code style="color:var(--accent-gold); background:var(--bg-secondary); padding:2px 6px; border-radius:3px;">python main.py --monitor</code> to start watching wallets</span>
+                    <span style="font-size:12px; font-family:var(--font-body);">Run <code style="color:var(--accent-gold); background:var(--bg-secondary); padding:2px 6px; border-radius:3px;">python main.py --dry-run</code> to start watching wallets</span>
                 </div>
             </div>
         </div>`;
@@ -2804,7 +2884,7 @@ const AudioSystem = {
         this.musicPlaying = true;
 
         if (!this.audioEl) {
-            this.audioEl = new Audio('/static/audio/gloomy.mp3');
+            this.audioEl = new Audio('/static/audio/rome_ambient.webm');
             this.audioEl.loop = true;
             this.audioEl.volume = 0.3;
             this.audioEl.preload = 'auto';

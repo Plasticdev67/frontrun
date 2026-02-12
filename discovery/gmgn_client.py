@@ -246,7 +246,7 @@ class GMGNClient:
 
         Returns list of enriched wallet dicts that pass all filters.
         """
-        BAD_TAGS = {"sandwich_bot", "scammer", "rug_deployer"}
+        BAD_TAGS = {"sandwich_bot", "scammer", "rug_deployer", "sniper_bot", "mev_bot", "copy_bot", "arb_bot"}
 
         # --- Attempt 1: Try the leaderboard endpoint directly ---
         logger.info("smart_money_trying_leaderboard")
@@ -390,8 +390,9 @@ class GMGNClient:
             if profit_30d < min_profit_30d:
                 continue
 
-            # Filter 3: Winrate (skip check if NULL — many wallets don't have it)
-            if winrate is not None and _float(winrate) < min_winrate:
+            # Filter 3: Winrate — REQUIRE it. NULL winrate = unverified = reject.
+            # Previously NULL winrate passed, letting unvetted snipers through.
+            if winrate is None or _float(winrate) < min_winrate:
                 continue
 
             # Filter 4: Activity range (not inactive, not a bot)
@@ -402,9 +403,16 @@ class GMGNClient:
             if sol_balance < min_sol_balance:
                 continue
 
-            # Filter 6: No bad tags
+            # Filter 6: No bad tags (bot platforms + known bad actors)
             tag_set = set(t.lower().replace(" ", "_") for t in tags) if tags else set()
             if tag_set & bad_tags:
+                continue
+
+            # Filter 7: No sniper bot platforms (axiom, photon, bullx)
+            # These are profitable but uncopyable — they buy tokens within
+            # milliseconds of launch, way too fast for copy trading.
+            SNIPER_PLATFORMS = {"axiom", "photon", "bullx"}
+            if tag_set & SNIPER_PLATFORMS:
                 continue
 
             # Passed all filters — build wallet dict

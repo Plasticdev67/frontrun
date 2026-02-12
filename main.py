@@ -16,6 +16,8 @@ Usage:
     python main.py --dry-run        # Start in dry-run mode (no real trades)
     python main.py --dashboard      # Launch the web dashboard
     python main.py --discover-fomo  # Discover FOMO wallets from blockchain
+    python main.py --fix-prices     # Backfill $0 positions with DexScreener prices
+    python main.py --close-dead     # Close all zombie positions ($0 entry)
 """
 
 import asyncio
@@ -87,6 +89,8 @@ async def main() -> None:
     parser.add_argument("--agent", action="store_true", help="Run the agent brain (autonomous mode)")
     parser.add_argument("--agent-learn", action="store_true", help="Run the agent's learning cycle on its journal")
     parser.add_argument("--agent-status", action="store_true", help="Show the agent's current strategy and stats")
+    parser.add_argument("--fix-prices", action="store_true", help="Backfill $0 entry prices on existing positions")
+    parser.add_argument("--close-dead", action="store_true", help="Close all dead/zombie positions ($0 entry, no price data)")
     parser.add_argument("--yes", action="store_true", help="Skip confirmation prompts")
     args = parser.parse_args()
 
@@ -334,6 +338,102 @@ async def main() -> None:
                     print(f"    • {adj}")
             else:
                 print(f"  No adjustments needed.")
+            print(f"{'='*60}\n")
+            return
+
+        elif args.close_dead:
+            # Close all zombie positions — $0 entry or no price data
+            from datetime import datetime as _dt, timezone as _tz
+
+            print(f"\n{'='*60}")
+            print(f"  Close Dead Positions")
+            print(f"{'='*60}")
+
+            positions = await db.get_open_positions()
+            if not positions:
+                print("  No open positions found.")
+                return
+
+            print(f"  Open positions: {len(positions)}")
+            closed = 0
+
+            for pos in positions:
+                entry = pos.get("entry_price_usd") or 0
+                sym = pos.get("token_symbol", pos["token_mint"][:8])
+                reason = None
+
+                if entry <= 0:
+                    reason = "dead_token_no_price"
+                    print(f"  CLOSED  #{pos['id']:3d} {sym:12s} — $0 entry price")
+
+                if reason:
+                    await db.close_position(pos["id"], reason, 0)
+                    closed += 1
+
+            print(f"\n  Closed: {closed} | Remaining: {len(positions) - closed}")
+            print(f"{'='*60}\n")
+            return
+
+        elif args.fix_prices:
+            # Backfill $0 entry prices on existing positions
+            import aiohttp
+
+            print(f"\n{'='*60}")
+            print(f"  Fix Prices — Backfilling $0 Positions")
+            print(f"{'='*60}")
+
+            positions = await db.get_open_positions()
+            zero_positions = [p for p in positions if not p.get("entry_price_usd") or p["entry_price_usd"] <= 0]
+
+            if not zero_positions:
+                print("  No $0 positions found — all good!")
+                return
+
+            print(f"  Found {len(zero_positions)} positions with $0 entry price\n")
+
+            fixed = 0
+            closed_dead = 0
+
+            async with aiohttp.ClientSession() as session:
+                for pos in zero_positions:
+                    token_mint = pos["token_mint"]
+                    token_symbol = pos.get("token_symbol", token_mint[:8])
+
+                    try:
+                        url = f"https://api.dexscreener.com/latest/dex/tokens/{token_mint}"
+                        async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                pairs = data.get("pairs") or []
+
+                                if pairs:
+                                    best = max(pairs, key=lambda p: float((p.get("liquidity") or {}).get("usd", 0) or 0))
+                                    price = float(best.get("priceUsd") or 0)
+                                    liq = float((best.get("liquidity") or {}).get("usd", 0) or 0)
+
+                                    if price > 0:
+                                        await db.connection.execute(
+                                            "UPDATE positions SET entry_price_usd = ?, current_price_usd = ? WHERE id = ?",
+                                            (price, price, pos["id"])
+                                        )
+                                        await db.connection.commit()
+                                        fixed += 1
+                                        print(f"  FIXED  {token_symbol:12s} → ${price:.10f} (liq: ${liq:,.0f})")
+                                    else:
+                                        await db.close_position(pos["id"], "dead_token", 0)
+                                        closed_dead += 1
+                                        print(f"  DEAD   {token_symbol:12s} → closed (price=0, has pairs but no price)")
+                                else:
+                                    await db.close_position(pos["id"], "dead_token", 0)
+                                    closed_dead += 1
+                                    print(f"  DEAD   {token_symbol:12s} → closed (no pairs found)")
+                    except Exception as e:
+                        print(f"  ERROR  {token_symbol:12s} → {e}")
+
+                    await asyncio.sleep(0.3)  # Rate limit
+
+            print(f"\n{'='*60}")
+            print(f"  Fixed: {fixed} | Dead: {closed_dead} | Remaining: {len(zero_positions) - fixed - closed_dead}")
             print(f"{'='*60}\n")
             return
 

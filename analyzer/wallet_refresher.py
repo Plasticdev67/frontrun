@@ -16,9 +16,10 @@ Where:
 - copy_perf: multiplier from our own copy results (default 1.0)
 - bot_discount: 0.7 if bot-speed else 1.0 — trust humans more
 
-Bot detection (smarter than raw trade count):
+Bot detection (multi-layered):
 - Primary: GMGN tags (sandwich_bot, sniper_bot, mev_bot, copy_bot, arb_bot)
-- Secondary: 200+ trades/day (clearly automated — real degens do 50-150/day)
+- Secondary: 50+ trades/day (real humans do 5-30/day)
+- Tertiary: Sniper platforms (axiom, photon, bullx) — profitable but uncopyable
 """
 
 import asyncio
@@ -93,6 +94,8 @@ class WalletRefresher:
         # raw trade frequency is secondary (200+/day = clearly automated).
         # Real degens easily do 50-150 trades/day — that's human behavior.
         BOT_TAGS = {"sandwich_bot", "sniper_bot", "mev_bot", "copy_bot", "arb_bot"}
+        # Sniper bot platforms — profitable but uncopyable (millisecond entries)
+        SNIPER_PLATFORMS = {"axiom", "photon", "bullx"}
 
         for w in fresh_wallets:
             buy_30d = w.get("gmgn_buy_30d", 0) or 0
@@ -106,14 +109,16 @@ class WalletRefresher:
                     raw_tags = json.loads(raw_tags)
                 except (json.JSONDecodeError, TypeError):
                     raw_tags = []
-            tag_set = set(raw_tags)
+            tag_set = set(t.lower() for t in raw_tags)
 
             # Primary: GMGN tagged as bot type
             is_bot_by_tag = bool(tag_set & BOT_TAGS)
-            # Secondary: trade frequency clearly automated (200+/day)
+            # Secondary: trade frequency clearly automated (50+/day)
             is_bot_by_speed = trades_per_day >= self.settings.bot_speed_threshold
+            # Tertiary: uses sniper bot platform (axiom, photon, bullx)
+            is_sniper_platform = bool(tag_set & SNIPER_PLATFORMS)
 
-            is_bot = is_bot_by_tag or is_bot_by_speed
+            is_bot = is_bot_by_tag or is_bot_by_speed or is_sniper_platform
 
             w["is_bot_speed"] = is_bot
             w["source"] = "gmgn"
@@ -122,6 +127,8 @@ class WalletRefresher:
 
             if is_bot_by_tag:
                 w["flag_reason"] = f"BOT: GMGN tagged {tag_set & BOT_TAGS}"
+            elif is_sniper_platform:
+                w["flag_reason"] = f"SNIPER: uses {tag_set & SNIPER_PLATFORMS} (uncopyable)"
             elif is_bot_by_speed:
                 w["flag_reason"] = f"BOT? {trades_per_day:.0f} trades/day"
 
@@ -204,10 +211,10 @@ class WalletRefresher:
 
         Components (max 100 points):
         - Profit (40 pts): 30-day realized profit, capped at $100K
-        - Win Rate (25 pts): GMGN winrate percentage
-        - Consistency (20 pts): Steady trading activity over 30 days
+        - Win Rate (30 pts): GMGN winrate — most important signal
+        - Consistency (15 pts): Sweet spot at ~15 trades/day. Over 30/day penalized.
         - Balance (10 pts): SOL available to trade with
-        - Bot Penalty (-10 pts): If flagged as bot, lose 10 points
+        - Bot Penalty (-20 pts): If flagged as bot/sniper, heavy penalty
         - Copy Bonus (+5/-5 pts): Our actual results copying this wallet
         """
         if copy_perf is None:
@@ -227,20 +234,28 @@ class WalletRefresher:
         else:
             profit_score = 0.0
 
-        # Win rate score (0-25): winrate * 25 (GMGN winrate is 0-1)
+        # Win rate score (0-30): winrate * 30 — MOST IMPORTANT signal
+        # Wallets with NULL/0 winrate get 0 points (previously they scored 70 anyway)
         if winrate > 1:
             winrate = winrate / 100  # Handle if given as percentage
-        winrate_score = min(25.0, winrate * 25)
+        winrate_score = min(30.0, winrate * 30)
 
-        # Consistency score (0-20): based on trades over 30 days
+        # Consistency score (0-15): sweet spot is 5-30 trades/day
+        # Too few = inactive, too many = bot. Peak score at ~15 trades/day (450/month)
         trades_30d = buy_30d + sell_30d
-        consistency_score = min(20.0, (trades_30d / 200) * 20)
+        trades_per_day = trades_30d / 30
+        if trades_per_day <= 30:
+            # Normal range: 0-30 trades/day, reward linearly up to 15/day
+            consistency_score = min(15.0, (trades_per_day / 15) * 15)
+        else:
+            # Over 30/day: penalize (likely bot). Score drops toward 0.
+            consistency_score = max(0.0, 15.0 - ((trades_per_day - 30) / 30) * 15)
 
         # Balance score (0-10): SOL balance, capped at 50 SOL
         balance_score = min(10.0, (sol_balance / 50) * 10)
 
-        # Bot penalty: -10 if bot
-        bot_penalty = -10.0 if is_bot else 0.0
+        # Bot penalty: -20 if bot/sniper (heavier than before)
+        bot_penalty = -20.0 if is_bot else 0.0
 
         # Copy performance bonus: +5 if proven winner, -5 if proven loser
         wallet_addr = w.get("address", "")

@@ -33,7 +33,8 @@ logger = get_logger(__name__)
 # Minimum token age in seconds before we'll copy a buy.
 # Tokens younger than this are likely fresh launches where the buyer may be
 # the creator/deployer — classic pump-and-dump pattern.
-MIN_TOKEN_AGE_SECONDS = 300  # 5 minutes
+MIN_TOKEN_AGE_SECONDS = 1800  # 30 minutes — give token time to prove itself
+MIN_TOKEN_VOLUME_24H_USD = 5000  # $5K minimum 24h volume
 
 
 class SignalGenerator:
@@ -142,13 +143,26 @@ class SignalGenerator:
                     await self.db.mark_signal_skipped(signal.get("signal_id", 0), "mcap_too_high")
                     return False, signal, reason
 
-        # Check 7: Honeypot detection (can we actually sell this token?)
+        # Check 7: Price required — can't track PnL without a real entry price
+        price_usd = (token_data or {}).get("price_usd", 0) or 0
+        if not price_usd or price_usd <= 0:
+            await self.db.mark_signal_skipped(signal.get("signal_id", 0), "no_price_data")
+            return False, signal, "No price data available — can't track PnL"
+
+        # Check 8: Minimum 24h volume — token needs real trading activity
+        volume_24h = (token_data or {}).get("volume_24h_usd", 0) or 0
+        if volume_24h < MIN_TOKEN_VOLUME_24H_USD:
+            reason = f"Volume too low: ${volume_24h:,.0f} (min: ${MIN_TOKEN_VOLUME_24H_USD:,.0f})"
+            await self.db.mark_signal_skipped(signal.get("signal_id", 0), "low_volume")
+            return False, signal, reason
+
+        # Check 9: Honeypot detection (can we actually sell this token?)
         is_honeypot = await self._check_honeypot(token_mint)
         if is_honeypot:
             await self.db.mark_signal_skipped(signal.get("signal_id", 0), "honeypot_detected")
             return False, signal, "Honeypot detected — token cannot be sold"
 
-        # Check 8: Token age — skip very new tokens (likely fresh launches)
+        # Check 10: Token age — skip very new tokens (likely fresh launches)
         # Token creators buy their own token immediately after launch → pump & dump
         token_age = await self._get_token_age(token_mint)
         if token_age is not None and token_age < MIN_TOKEN_AGE_SECONDS:
@@ -156,7 +170,7 @@ class SignalGenerator:
             await self.db.mark_signal_skipped(signal.get("signal_id", 0), "token_too_new")
             return False, signal, reason
 
-        # Check 9: Creator detection — is the buyer also the token deployer?
+        # Check 11: Creator detection — is the buyer also the token deployer?
         # Classic rug: creator launches token, "buys" it, price spikes, then dumps
         is_creator = await self._is_token_creator(token_mint, signal["wallet_address"])
         if is_creator:
@@ -179,9 +193,15 @@ class SignalGenerator:
             signal["signal_source_type"] = "consensus"
             signal["consensus_count"] = consensus_count
 
+        # Check 12: Consensus-only mode — skip single-wallet signals
+        source_type = signal["signal_source_type"]
+        if self.settings.consensus_only_mode and source_type != "consensus":
+            reason = f"Consensus-only mode — skipping single-wallet signal ({source_type})"
+            await self.db.mark_signal_skipped(signal.get("signal_id", 0), "consensus_only")
+            return False, signal, reason
+
         # Set position size based on wallet type
         base_size = self.settings.default_position_size_sol
-        source_type = signal["signal_source_type"]
 
         if source_type == "consensus":
             position_size = base_size * self.settings.consensus_position_multiplier

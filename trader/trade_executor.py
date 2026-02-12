@@ -283,8 +283,16 @@ class TradeExecutor:
         if signal.get("signal_id"):
             await self.db.mark_signal_executed(signal["signal_id"], trade_id)
 
+        # Only open a position if we have a real price — $0 positions are useless
+        if not price_usd or price_usd <= 0:
+            logger.warning(
+                "dry_run_no_price",
+                token=token_symbol,
+                note="Skipping position creation — no price data for PnL tracking",
+            )
+            return {"trade_id": trade_id, "status": "dry_run"}
+
         # Open a position record so the position manager can track TP/SL
-        # Even in dry_run we need positions to simulate the full lifecycle
         import json
         source_type = signal.get("signal_source_type", "human") or "human"
         from trader.position_manager import EXIT_RULES
@@ -355,12 +363,47 @@ class TradeExecutor:
         )
 
         if self.settings.trading_mode == "dry_run":
-            logger.info(
-                "DRY_RUN_SELL",
-                token=token_symbol,
-                reason=reason,
-                percentage=f"{sell_percentage*100:.0f}%",
-            )
+            # In dry_run mode, simulate the sell and CLOSE the position in DB
+            # Without this, positions stay open forever and block new trades
+            entry_price = position.get("entry_price_usd", 0) or 0
+            current_price = position.get("current_price_usd", 0) or 0
+
+            if sell_percentage >= 1.0:
+                # Full close — calculate simulated PnL
+                invested = position.get("amount_sol_invested", 0) or 0
+                if entry_price > 0 and current_price > 0:
+                    multiplier = current_price / entry_price
+                    simulated_pnl = invested * (multiplier - 1)
+                else:
+                    simulated_pnl = 0
+
+                await self.db.close_position(position["id"], reason, simulated_pnl)
+                logger.info(
+                    "DRY_RUN_SELL",
+                    token=token_symbol,
+                    reason=reason,
+                    percentage=f"{sell_percentage*100:.0f}%",
+                    simulated_pnl=f"{simulated_pnl:+.6f} SOL",
+                )
+            else:
+                # Partial sell — just log it (position stays open)
+                logger.info(
+                    "DRY_RUN_SELL",
+                    token=token_symbol,
+                    reason=reason,
+                    percentage=f"{sell_percentage*100:.0f}%",
+                )
+
+            # Push Telegram notification for dry-run sells too
+            if self.notifier:
+                await self.notifier.notify_sell({
+                    "token_symbol": token_symbol,
+                    "sol_received": 0,
+                    "reason": f"[DRY_RUN] {reason}",
+                    "status": "dry_run",
+                    "tx_signature": "dry_run",
+                })
+
             return {"status": "dry_run", "reason": reason}
 
         # Get Jupiter quote (token -> SOL)
