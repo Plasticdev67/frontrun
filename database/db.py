@@ -479,6 +479,18 @@ class Database:
         await self.connection.execute(sql, (current_price, unrealized_pnl, now, position_id))
         await self.connection.commit()
 
+    async def update_position_tp_levels(self, position_id: int, tp_levels_json: str) -> None:
+        """Save updated take-profit levels (with hit flags) back to the position."""
+        sql = "UPDATE positions SET take_profit_levels = ? WHERE id = ?"
+        await self.connection.execute(sql, (tp_levels_json, position_id))
+        await self.connection.commit()
+
+    async def update_position_tokens(self, position_id: int, new_token_amount: float) -> None:
+        """Update remaining tokens after a partial sell."""
+        sql = "UPDATE positions SET amount_tokens_held = ? WHERE id = ?"
+        await self.connection.execute(sql, (new_token_amount, position_id))
+        await self.connection.commit()
+
     # =========================================================================
     # Daily Stats (Stage 5: Telegram summaries)
     # =========================================================================

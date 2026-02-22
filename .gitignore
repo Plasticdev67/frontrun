@@ -18,6 +18,11 @@ build/
 *.db
 *.sqlite3
 
+# Data directory (generated outputs, investigation artifacts)
+data/*.pdf
+data/*.json
+!data/agent_strategy.json
+
 # IDE
 .vscode/
 .idea/
@@ -31,3 +36,7 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Large media files (dashboard audio — too big for git)
+dashboard/static/audio/*.webm
+dashboard/static/audio/*.mp3

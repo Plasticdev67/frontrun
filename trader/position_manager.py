@@ -252,8 +252,13 @@ class PositionManager:
                         if self.executor:
                             await self.executor.execute_sell(position, sell_pct, "take_profit")
 
-                        # Mark this level as hit
+                        # Mark this level as hit and SAVE to DB
+                        # Without saving, next check cycle reads fresh from DB
+                        # and triggers the same level again (infinite loop)
                         tp_levels[i]["hit"] = True
+                        await self.db.update_position_tp_levels(
+                            position["id"], json.dumps(tp_levels)
+                        )
                         break  # Only trigger one level per check cycle
 
                 await asyncio.sleep(0.3)  # Rate limit between position checks

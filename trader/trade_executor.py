@@ -386,12 +386,16 @@ class TradeExecutor:
                     simulated_pnl=f"{simulated_pnl:+.6f} SOL",
                 )
             else:
-                # Partial sell — just log it (position stays open)
+                # Partial sell — reduce token count so we don't sell the same tokens twice
+                remaining = position["amount_tokens_held"] - tokens_to_sell
+                await self.db.update_position_tokens(position["id"], remaining)
                 logger.info(
                     "DRY_RUN_SELL",
                     token=token_symbol,
                     reason=reason,
                     percentage=f"{sell_percentage*100:.0f}%",
+                    tokens_sold=tokens_to_sell,
+                    remaining=remaining,
                 )
 
             # Push Telegram notification for dry-run sells too
